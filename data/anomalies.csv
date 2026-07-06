@@ -1,0 +1,5 @@
+date,merchant,category,amount,reason,severity
+2026-06-10,Food_vendor_5,Food,-133.01544235207248,Statistical anomaly: High spend vs category average,Critical
+2026-04-25,Software_vendor_17,Software,-143.5181413946951,Statistical anomaly: High spend vs category average,Critical
+2026-04-24,Software_vendor_19,Software,-151.8328564313478,Statistical anomaly: High spend vs category average,Critical
+2026-04-18,Misc_vendor_17,Misc,-119.23713590860459,Statistical anomaly: High spend vs category average,Critical

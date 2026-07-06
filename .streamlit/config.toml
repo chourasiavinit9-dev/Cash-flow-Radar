@@ -1,0 +1,13 @@
+[theme]
+# CashFlow Radar — Streamlit Theme Config
+# CUSTOM STYLE GOES HERE — Override these values with your own palette
+
+primaryColor = "#B2D5E5"          # Candy Blue — buttons, sliders, active widgets
+backgroundColor = "#EAF3F9"       # Light ice blue page background
+secondaryBackgroundColor = "#F5F0FA"  # Orchid-tinted secondary panels / sidebar
+textColor = "#1D1D1D"             # Onyx — primary text
+font = "sans serif"               # Inter is loaded via CSS; this is the fallback
+
+[server]
+headless = true
+runOnSave = false

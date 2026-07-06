@@ -1,0 +1,6 @@
+# CashFlow Radar — Dashboard Dependencies
+streamlit>=1.35.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.20.0
+pyarrow>=14.0.0
