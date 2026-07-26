@@ -21,6 +21,12 @@ try:
 except ImportError:
     PLOTLY_AVAILABLE = False
 
+try:
+    from google import genai as genai_sdk
+    GEMINI_SDK_AVAILABLE = True
+except ImportError:
+    GEMINI_SDK_AVAILABLE = False
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CUSTOM COLOUR PALETTE
@@ -65,6 +71,7 @@ def inject_css():
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+    @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css');
 
     /* ── Material Symbols class (used by Streamlit's own UI elements) ── */
     .material-symbols-outlined {
@@ -101,10 +108,72 @@ def inject_css():
         --radius-md:    16px;
         --radius-lg:    22px;
         --font:         'Inter', sans-serif;
+        /* ── Liquid Glass tokens ── */
+        --specular:     rgba(255, 255, 255, 0.50);
+        --inset-glow:   inset 0 1px 1px rgba(255, 255, 255, 0.40);
+        --liquid-blur:  blur(20px) saturate(180%);
     }
 
-    /* ── Global reset ── */
-    html, body, [class*="css"], [class*="st-"] {
+    /* ── Ambient background blob keyframes ── */
+    @keyframes blobDrift1 {
+        0%   { transform: translate(0%,  0%) scale(1);    }
+        33%  { transform: translate(3%, -4%) scale(1.04); }
+        66%  { transform: translate(-2%, 3%) scale(0.97); }
+        100% { transform: translate(0%,  0%) scale(1);    }
+    }
+    @keyframes blobDrift2 {
+        0%   { transform: translate(0%,  0%) scale(1);    }
+        40%  { transform: translate(-4%, 2%) scale(1.03); }
+        75%  { transform: translate(3%, -3%) scale(0.98); }
+        100% { transform: translate(0%,  0%) scale(1);    }
+    }
+    @keyframes blobDrift3 {
+        0%   { transform: translate(0%,  0%) scale(1);    }
+        50%  { transform: translate(2%,  4%) scale(1.02); }
+        100% { transform: translate(0%,  0%) scale(1);    }
+    }
+
+    /* ── Ambient blobs: blob 1 (candy-blue, top-left) & blob 2 (orchid, bottom-right) ── */
+    .stApp::before,
+    .stApp::after {
+        content: '';
+        position: fixed;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(80px);
+        will-change: transform;
+    }
+    .stApp::before {
+        width: 520px; height: 520px;
+        top: -80px; left: -100px;
+        background: radial-gradient(circle, rgba(178,213,229,0.22) 0%, transparent 70%);
+        animation: blobDrift1 28s ease-in-out infinite;
+    }
+    .stApp::after {
+        width: 440px; height: 440px;
+        bottom: -60px; right: -80px;
+        background: radial-gradient(circle, rgba(229,189,223,0.18) 0%, transparent 70%);
+        animation: blobDrift2 34s ease-in-out infinite;
+    }
+
+    /* ── Ambient blob 3: deep-blue, mid-screen ── */
+    [data-testid="stAppViewContainer"]::before {
+        content: '';
+        position: fixed;
+        width: 360px; height: 360px;
+        top: 40%; left: 55%;
+        background: radial-gradient(circle, rgba(111,168,192,0.11) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(70px);
+        animation: blobDrift3 22s ease-in-out infinite;
+        will-change: transform;
+    }
+
+    /* ── Global reset (scoped to app view container, excluding popovers/menus) ── */
+    html, body, [data-testid="stAppViewContainer"] {
         font-family: var(--font) !important;
         color: var(--onyx);
     }
@@ -117,50 +186,96 @@ def inject_css():
     .block-container {
         padding: 1.5rem 2rem 2rem 2rem !important;
         max-width: 1600px !important;
+        position: relative;
+        z-index: 1;
     }
 
-    /* ── Sidebar ── */
+    /* ── Sidebar — Liquid Glass ── */
     [data-testid="stSidebar"] {
-        background: rgba(255, 255, 255, 0.82) !important;
-        backdrop-filter: blur(18px) !important;
-        -webkit-backdrop-filter: blur(18px) !important;
+        background: rgba(255, 255, 255, 0.78) !important;
+        backdrop-filter: var(--liquid-blur) !important;
+        -webkit-backdrop-filter: var(--liquid-blur) !important;
         border-right: 1.5px solid var(--glass-border) !important;
-        box-shadow: var(--shadow-md) !important;
+        border-top: 1px solid var(--specular) !important;
+        box-shadow: var(--shadow-md), var(--inset-glow) !important;
     }
     [data-testid="stSidebar"] > div:first-child {
         padding-top: 1.8rem;
     }
 
-    /* ── Glass Card base ── */
-    .glass-card {
-        background: var(--glass-bg);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        border: 1.5px solid var(--glass-border);
-        border-radius: var(--radius-md);
-        box-shadow: var(--shadow-md);
-        padding: 1.4rem 1.6rem;
-        margin-bottom: 1rem;
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    /* ── Glass Card base — Liquid Glass ── */
+    .glass-card, [data-testid="stVerticalBlockBorderWrapper"] {
+        background: var(--glass-bg) !important;
+        backdrop-filter: var(--liquid-blur) !important;
+        -webkit-backdrop-filter: var(--liquid-blur) !important;
+        border: 1.5px solid var(--glass-border) !important;
+        border-top-color: rgba(255,255,255,0.55) !important;
+        border-radius: var(--radius-md) !important;
+        box-shadow: var(--shadow-md), var(--inset-glow) !important;
+        padding: 1.4rem 1.6rem !important;
+        margin-bottom: 1rem !important;
+        transition: box-shadow 0.25s ease, transform 0.25s ease, backdrop-filter 0.25s ease !important;
+        position: relative;
+        overflow: hidden;
     }
-    .glass-card:hover {
-        box-shadow: var(--shadow-lg);
-        transform: translateY(-1px);
+    /* Specular top-edge shimmer on glass cards */
+    .glass-card::before, [data-testid="stVerticalBlockBorderWrapper"]::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.60) 40%, rgba(255,255,255,0.60) 60%, transparent 100%);
+        pointer-events: none;
+        z-index: 2;
+    }
+    .glass-card:hover, [data-testid="stVerticalBlockBorderWrapper"]:hover {
+        box-shadow: var(--shadow-lg), inset 0 1px 2px rgba(255,255,255,0.50) !important;
+        transform: translateY(-2px);
+        backdrop-filter: blur(24px) saturate(200%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+    }
+    .glass-card:empty, .risk-card:empty,
+    [data-testid="stVerticalBlockBorderWrapper"]:empty {
+        display: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        height: 0 !important;
     }
 
-    /* ── KPI metric cards ── */
+    /* ── KPI metric cards — Liquid Glass ── */
     .kpi-card {
         background: var(--glass-bg);
-        backdrop-filter: blur(14px);
+        backdrop-filter: var(--liquid-blur);
+        -webkit-backdrop-filter: var(--liquid-blur);
         border: 1.5px solid var(--glass-border);
+        border-top-color: rgba(255,255,255,0.60);
         border-radius: var(--radius-md);
-        box-shadow: var(--shadow-sm);
+        box-shadow: var(--shadow-sm), var(--inset-glow);
         padding: 1.1rem 1.4rem;
         text-align: left;
         min-height: 90px;
-        transition: all 0.2s ease;
+        transition: all 0.25s ease;
+        position: relative;
+        overflow: hidden;
     }
-    .kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    /* Specular top-edge shimmer on KPI cards */
+    .kpi-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 35%, rgba(255,255,255,0.55) 65%, transparent 100%);
+        pointer-events: none;
+        z-index: 2;
+    }
+    .kpi-card:hover {
+        box-shadow: var(--shadow-md), inset 0 1px 2px rgba(255,255,255,0.50);
+        transform: translateY(-2px);
+        backdrop-filter: blur(24px) saturate(200%);
+        -webkit-backdrop-filter: blur(24px) saturate(200%);
+    }
     .kpi-label {
         font-size: 0.72rem;
         font-weight: 500;
@@ -195,14 +310,32 @@ def inject_css():
         margin-bottom: 0.5rem;
     }
 
-    /* ── Hero balance card ── */
+    /* ── Hero balance card — Liquid Glass ── */
     .hero-card {
-        background: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(240,246,250,0.90) 100%);
-        backdrop-filter: blur(18px);
+        background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(240,246,250,0.92) 100%);
+        backdrop-filter: var(--liquid-blur);
+        -webkit-backdrop-filter: var(--liquid-blur);
         border: 1.5px solid var(--glass-border);
+        border-top-color: rgba(255,255,255,0.65);
         border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-lg);
+        box-shadow: var(--shadow-lg), var(--inset-glow);
         padding: 2rem 2.2rem;
+        position: relative;
+        overflow: hidden;
+        transition: box-shadow 0.25s ease, transform 0.25s ease;
+    }
+    .hero-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.70) 30%, rgba(255,255,255,0.70) 70%, transparent 100%);
+        pointer-events: none;
+        z-index: 2;
+    }
+    .hero-card:hover {
+        box-shadow: var(--shadow-lg), inset 0 1px 2px rgba(255,255,255,0.55);
+        transform: translateY(-2px);
     }
     .hero-label { font-size: 0.8rem; font-weight: 500; color: var(--slate); letter-spacing: 0.05em; text-transform: uppercase; }
     .hero-amount { font-size: 2.8rem; font-weight: 700; color: var(--onyx); letter-spacing: -0.04em; margin: 0.2rem 0; }
@@ -235,15 +368,33 @@ def inject_css():
         display: inline-block;
     }
 
-    /* ── Risk Score gauge card ── */
+    /* ── Risk Score gauge card — Liquid Glass ── */
     .risk-card {
-        background: linear-gradient(160deg, rgba(229,189,223,0.18) 0%, rgba(255,255,255,0.80) 100%);
-        backdrop-filter: blur(16px);
-        border: 1.5px solid rgba(229,189,223,0.40);
+        background: linear-gradient(160deg, rgba(229,189,223,0.20) 0%, rgba(255,255,255,0.82) 100%);
+        backdrop-filter: var(--liquid-blur);
+        -webkit-backdrop-filter: var(--liquid-blur);
+        border: 1.5px solid rgba(229,189,223,0.42);
+        border-top-color: rgba(255,255,255,0.60);
         border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-md);
+        box-shadow: var(--shadow-md), var(--inset-glow);
         padding: 1.6rem;
         text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: box-shadow 0.25s ease, transform 0.25s ease;
+    }
+    .risk-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.62) 40%, rgba(255,255,255,0.62) 60%, transparent 100%);
+        pointer-events: none;
+        z-index: 2;
+    }
+    .risk-card:hover {
+        box-shadow: var(--shadow-lg), inset 0 1px 2px rgba(255,255,255,0.50);
+        transform: translateY(-2px);
     }
     .risk-score-number {
         font-size: 3rem;
@@ -315,8 +466,8 @@ def inject_css():
         border-radius: 10px !important;
     }
 
-    /* ── Buttons ── */
-    .stButton > button {
+    /* ── Buttons (scoped to standard Streamlit button containers) ── */
+    [data-testid="stElementContainer"] > div.stButton > button {
         background: var(--glass-bg) !important;
         border: 1.5px solid var(--glass-border) !important;
         border-radius: 10px !important;
@@ -327,17 +478,34 @@ def inject_css():
         padding: 0.45rem 1.2rem !important;
         transition: all 0.18s ease !important;
     }
-    .stButton > button:hover {
+    [data-testid="stElementContainer"] > div.stButton > button:hover {
         background: var(--candy-blue) !important;
         border-color: var(--deep-blue) !important;
         color: #fff !important;
         box-shadow: 0 4px 16px rgba(111,168,192,0.30) !important;
     }
-    .stButton > button[kind="primary"] {
+    [data-testid="stElementContainer"] > div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, var(--candy-blue), var(--deep-blue)) !important;
         border: none !important;
         color: white !important;
         box-shadow: 0 4px 16px rgba(111,168,192,0.35) !important;
+    }
+
+    /* ── Protect Streamlit Dataframe Column Menus & Popovers ── */
+    [data-baseweb="popover"],
+    [data-baseweb="menu"],
+    [data-baseweb="popover"] *,
+    [data-testid="stDataFrame"] *,
+    div[class*="glide-data-grid"] * {
+        box-sizing: border-box;
+    }
+    [data-baseweb="popover"] button,
+    [data-testid="stDataFrame"] button {
+        background: unset !important;
+        border: unset !important;
+        border-radius: unset !important;
+        padding: unset !important;
+        box-shadow: unset !important;
     }
 
     /* ── Plotly chart background ── */
@@ -349,13 +517,16 @@ def inject_css():
     /* ── Dividers ── */
     hr { border-color: rgba(178,213,229,0.25) !important; margin: 1.2rem 0 !important; }
 
-    /* ── Streamlit metric override ── */
+    /* ── Streamlit metric override — Liquid Glass ── */
     [data-testid="stMetric"] {
         background: var(--glass-bg);
+        backdrop-filter: var(--liquid-blur);
+        -webkit-backdrop-filter: var(--liquid-blur);
         border: 1.5px solid var(--glass-border);
+        border-top-color: rgba(255,255,255,0.55);
         border-radius: var(--radius-md);
         padding: 1rem 1.2rem;
-        box-shadow: var(--shadow-sm);
+        box-shadow: var(--shadow-sm), var(--inset-glow);
     }
     [data-testid="stMetricLabel"] { font-size: 0.72rem !important; color: var(--slate) !important; }
     [data-testid="stMetricValue"] { font-size: 1.5rem !important; font-weight: 700 !important; }
@@ -397,10 +568,26 @@ def inject_css():
         color: var(--slate);
         cursor: pointer;
         margin-bottom: 2px;
-        transition: all 0.15s;
+        transition: all 0.18s ease;
     }
     .nav-item:hover  { background: rgba(178,213,229,0.18); color: var(--onyx); }
-    .nav-item.active { background: rgba(178,213,229,0.30); color: var(--onyx); font-weight: 600; }
+    .nav-item.active { background: rgba(178,213,229,0.30); color: var(--onyx); font-weight: 600; box-shadow: inset 3px 0 0 var(--deep-blue); }
+
+    /* ── Nav icon — Tabler icon font ── */
+    .nav-ti {
+        font-family: 'tabler-icons' !important;
+        font-style: normal;
+        font-size: 1.15rem;
+        line-height: 1;
+        width: 22px; height: 22px;
+        display: inline-flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        color: var(--slate);
+        transition: color 0.18s ease;
+    }
+    .nav-item:hover .nav-ti,
+    .nav-item.active .nav-ti { color: var(--deep-blue); }
+
 
     /* ── Benchmark highlight ── */
     .speedup-pill {
@@ -457,51 +644,60 @@ def inject_css():
         height: 0 !important;
         pointer-events: none !important;
     }
-    /* Keep sidebar pinned open — disable Streamlit's responsive auto-collapse */
+    /* Keep sidebar pinned open */
     [data-testid="stSidebar"] { display: block !important; transform: none !important; }
 
-    /* ── Sidebar nav BUTTONS — override Streamlit defaults to match .nav-item style ── */
+    /* ── Sidebar nav BUTTONS — transparent overlay on top of .nav-inactive div ── */
     [data-testid="stSidebar"] .stButton > button {
         display: flex !important;
         align-items: center !important;
-        padding: 0.6rem 0.8rem !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        padding: 0 0.8rem !important;
         border-radius: 10px !important;
-        font-size: 0.87rem !important;
-        font-weight: 500 !important;
-        color: var(--slate) !important;
-        background: transparent !important;
         border: none !important;
+        background: transparent !important;
         box-shadow: none !important;
         width: 100% !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-        transition: background 0.15s, color 0.15s !important;
-        margin-bottom: 2px !important;
-        letter-spacing: 0 !important;
         cursor: pointer !important;
+        opacity: 0 !important;
+        margin-top: -42px !important;
+        margin-bottom: 2px !important;
+        position: relative !important;
+        z-index: 10 !important;
     }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background: rgba(178,213,229,0.18) !important;
-        color: var(--onyx) !important;
-        box-shadow: none !important;
-    }
+    [data-testid="stSidebar"] .stButton > button:hover,
     [data-testid="stSidebar"] .stButton > button:focus:not(:active) {
         box-shadow: none !important;
         outline: none !important;
+        background: transparent !important;
+    }
+    /* Nav inactive HTML div — visual only */
+    .nav-inactive {
+        pointer-events: none;
     }
     [data-testid="stSidebar"] [data-testid="stButton"] {
         margin-bottom: 0 !important;
     }
 
-    /* ── Stat cards (Accounts view) ── */
+
+    /* ── Stat cards (Accounts view) — Liquid Glass ── */
     .stat-card {
         background: var(--glass-bg);
+        backdrop-filter: var(--liquid-blur);
+        -webkit-backdrop-filter: var(--liquid-blur);
         border: 1.5px solid var(--glass-border);
+        border-top-color: rgba(255,255,255,0.55);
         border-radius: var(--radius-md);
-        box-shadow: var(--shadow-sm);
+        box-shadow: var(--shadow-sm), var(--inset-glow);
         padding: 1rem 1.2rem;
         text-align: center;
         margin-bottom: 0.6rem;
+        transition: box-shadow 0.25s ease, transform 0.25s ease;
+    }
+    .stat-card:hover {
+        box-shadow: var(--shadow-md), inset 0 1px 2px rgba(255,255,255,0.50);
+        transform: translateY(-2px);
     }
     .stat-label { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--slate); margin-bottom: 0.3rem; }
     .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--onyx); letter-spacing: -0.03em; }
@@ -545,32 +741,6 @@ def inject_css():
     </style>
     """, unsafe_allow_html=True)
 
-    # JS fallback: hide the collapse button by its visible text content.
-    # This catches it regardless of class/data-testid (which change per Streamlit version).
-    # Runs immediately AND on a short interval to catch React re-renders.
-    st.markdown("""
-    <script>
-    (function hideSidebarToggle() {
-        function remove() {
-            document.querySelectorAll('button, span').forEach(function(el) {
-                var t = el.textContent.trim();
-                if (t === 'keyboard_double_arrow_right' ||
-                    t === 'keyboard_double_arrow_left'  ||
-                    t === 'chevron_left' || t === 'chevron_right') {
-                    var btn = el.closest('button') || el;
-                    btn.style.cssText = 'display:none!important;visibility:hidden!important;width:0!important;height:0!important';
-                }
-            });
-        }
-        remove();
-        var _interval = setInterval(remove, 500);
-        // Stop after 30s to avoid running forever
-        setTimeout(function(){ clearInterval(_interval); }, 30000);
-    })();
-    </script>
-    """, unsafe_allow_html=True)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPERS — HTML components
 # ─────────────────────────────────────────────────────────────────────────────
@@ -600,6 +770,55 @@ def kpi_html(label: str, value: str, delta: str = "", delta_dir: str = "flat", i
 
 def section_header(title: str, icon: str = "") -> str:
     return f'<div class="section-header"><span class="dot"></span>{icon} {title}</div>'
+
+
+def get_currency_symbol() -> str:
+    return st.session_state.get("currency_symbol", "$")
+
+
+def get_safety_buffer() -> float:
+    return float(st.session_state.get("safety_buffer", 1000.0))
+
+
+def fmt_curr(val: float, decimals: int = 0) -> str:
+    sym = get_currency_symbol()
+    if val < 0:
+        return f"-{sym}{abs(val):,.{decimals}f}"
+    return f"{sym}{val:,.{decimals}f}"
+
+
+def compute_dynamic_risk(risk_data: dict | None, forecast_df: pd.DataFrame | None = None) -> tuple[float, str, str, str, str]:
+    safety_buffer = get_safety_buffer()
+    base_score = float(risk_data.get("score", 26.1)) if risk_data else 26.1
+    
+    if forecast_df is not None and "projected_balance" in forecast_df.columns:
+        min_proj = float(forecast_df["projected_balance"].min())
+        diff = min_proj - safety_buffer
+        if diff >= 700:
+            score = max(10.0, min(39.0, 26.1 - (diff - 781.95) / 100.0))
+        elif diff >= 0:
+            score = 35.0 + (1000 - diff) / 1000.0 * 10.0
+        elif diff >= -1500:
+            score = 45.0 + (abs(diff) / 1500.0) * 25.0
+        else:
+            score = min(98.0, 70.0 + (abs(diff + 1500) / 2000.0) * 28.0)
+    else:
+        # Adjustment relative to standard $1000 buffer baseline
+        diff = 1000.0 - safety_buffer
+        score = max(5.0, min(95.0, base_score - diff / 100.0))
+
+    score = round(score, 1)
+    if score < 40:
+        badge_cls, badge_lbl, score_color = "low", "Healthy", "#5BB896"
+        expl = f"Healthy cash flow. Projected balance stays comfortably above your {fmt_curr(safety_buffer)} safety buffer over the next 30 days."
+    elif score < 70:
+        badge_cls, badge_lbl, score_color = "medium", "Moderate Risk", "#F0A04B"
+        expl = f"Moderate risk detected. Projected balance comes close to or dips slightly below your {fmt_curr(safety_buffer)} safety buffer."
+    else:
+        badge_cls, badge_lbl, score_color = "high", "High Risk", "#E07070"
+        expl = f"High risk alert! Projected balance falls significantly below your {fmt_curr(safety_buffer)} safety buffer over the next 30 days."
+
+    return score, badge_cls, badge_lbl, score_color, expl
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -670,7 +889,6 @@ def load_benchmark() -> pd.DataFrame | None:
     return df.rename(columns=col_map)
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION: SIDEBAR
 # ─────────────────────────────────────────────────────────────────────────────
@@ -683,7 +901,9 @@ def render_sidebar(data_dir: str):
             <div style="width:36px;height:36px;border-radius:10px;
                         background:linear-gradient(135deg,#B2D5E5,#E5BDDF);
                         display:flex;align-items:center;justify-content:center;
-                        font-size:1.1rem;box-shadow:0 4px 12px rgba(178,213,229,0.4);">📡</div>
+                        box-shadow:0 4px 12px rgba(178,213,229,0.4);">
+                <i class='ti ti-radar-2' style='font-size:1.3rem;color:#1D1D1D;'></i>
+            </div>
             <div>
                 <div style="font-size:1.0rem;font-weight:700;color:#1D1D1D;letter-spacing:-0.02em;">CashFlow Radar</div>
                 <div style="font-size:0.68rem;color:#8FA8B8;font-weight:500;">Financial Intelligence</div>
@@ -691,35 +911,46 @@ def render_sidebar(data_dir: str):
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Navigation buttons (session_state-based view switching) ──
-        nav_items = [
-            ("📊", "Dashboard"),
-            ("💳", "Accounts"),
-            ("↔️", "Transactions"),
-            ("📈", "Analytics"),
-            ("🎯", "Budgets"),
-            ("⚙️", "Settings"),
+
+
+        # ── Navigation — Tabler Icons only (no base64, fast, reliable clicks) ──
+        NAV_ITEMS = [
+            ("ti-layout-dashboard",  "Dashboard"),
+            ("ti-credit-card",       "Accounts"),
+            ("ti-arrows-exchange",   "Transactions"),
+            ("ti-chart-bar",         "Analytics"),
+            ("ti-target",            "Budgets"),
+            ("ti-adjustments-horizontal", "Simulator"),
+            ("ti-file-analytics",    "Reports"),
+            ("ti-settings",          "Settings"),
         ]
+
         def _switch_view(view_name: str):
             st.session_state.current_view = view_name
 
         current = st.session_state.get("current_view", "Dashboard")
-        for icon, label in nav_items:
+        for ti_class, label in NAV_ITEMS:
+            icon_html = f'<i class="ti {ti_class}" style="font-size:1.15rem;width:22px;flex-shrink:0;color:inherit;"></i>'
             if current == label:
-                # Active item: styled div (no button chrome needed)
                 st.markdown(
-                    f'<div class="nav-item active">{icon}&nbsp;&nbsp;{label}</div>',
+                    f'<div class="nav-item active">{icon_html}<span>{label}</span></div>',
                     unsafe_allow_html=True
                 )
             else:
-                # Inactive: real button styled to match .nav-item
+                # Use markdown for inactive too — wrap a full clickable nav item
+                # with an overlapping transparent Streamlit button on top for click handling
+                st.markdown(
+                    f'<div class="nav-item nav-inactive" id="nav-{label}">{icon_html}<span>{label}</span></div>',
+                    unsafe_allow_html=True
+                )
                 st.button(
-                    f"{icon}  {label}",
+                    label,
                     key=f"nav__{label}",
                     on_click=_switch_view,
                     args=(label,),
                     use_container_width=True,
                 )
+
 
         st.markdown("<div style='margin:1.4rem 0 0.4rem;'>", unsafe_allow_html=True)
         st.markdown("---")
@@ -744,6 +975,340 @@ def render_sidebar(data_dir: str):
             )
 
 
+def generate_insight_fallback(query: str, curr_bal: float, score: float, badge_lbl: str, expl: str, min_proj: float) -> str:
+    import re
+    safety = get_safety_buffer()
+    match = re.search(r'\$?(\d+[\d,.]*)', query)
+    if match:
+        try:
+            amt = float(match.group(1).replace(',', ''))
+            remaining_after = min_proj - amt
+            if remaining_after >= safety:
+                return (f"Based on your current balance of {fmt_curr(curr_bal)} and 30-day projected balance minimum of {fmt_curr(min_proj)}, "
+                        f"you can comfortably afford this {fmt_curr(amt)} purchase while maintaining your {fmt_curr(safety)} safety buffer. "
+                        f"Your overall cash flow remains healthy with a risk score of {score}/100 ({badge_lbl}).")
+            else:
+                shortfall = safety - remaining_after
+                return (f"Caution advised: a {fmt_curr(amt)} purchase would bring your projected balance down to {fmt_curr(remaining_after)}, "
+                        f"which is {fmt_curr(shortfall)} below your {fmt_curr(safety)} safety buffer. "
+                        f"Your current risk score is {score}/100 ({badge_lbl}).")
+        except Exception:
+            pass
+    return (f"Your portfolio balance is currently {fmt_curr(curr_bal)} with a 30-day risk score of {score}/100 ({badge_lbl}). "
+            f"{expl} Keep an eye on upcoming recurring expenses and anomaly alerts before making large discretionary purchases.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION: MONEY WEATHER FORECAST CARD
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_money_weather(risk_data: dict | None, forecast_df: "pd.DataFrame | None"):
+    """Single-glance weather-metaphor card — reuses compute_dynamic_risk + forecast_df."""
+    score, _, _, _, _ = compute_dynamic_risk(risk_data, forecast_df)
+
+    # Check for first negative balance day in forecast
+    negative_day = None
+    if forecast_df is not None and "projected_balance" in forecast_df.columns and "date" in forecast_df.columns:
+        neg_rows = forecast_df[forecast_df["projected_balance"] < 0]
+        if not neg_rows.empty:
+            negative_day = neg_rows.iloc[0]["date"]
+
+    # Determine weather state
+    if negative_day is not None or score > 70:
+        if negative_day:
+            headline = f"⛈️ Cash Storm — negative balance projected on {negative_day}"
+        else:
+            headline = "⛈️ Cash Storm — high risk of negative balance ahead"
+        weather_color = "#E07070"
+        bg_color = "rgba(224,112,112,0.10)"
+        border_color = "rgba(224,112,112,0.30)"
+        bar_pct = min(int(score), 100)
+        bar_color = "#E07070"
+    elif score >= 50:
+        headline = "🌧️ Heavy Spending — watch your cash closely"
+        weather_color = "#F0A04B"
+        bg_color = "rgba(240,160,75,0.10)"
+        border_color = "rgba(240,160,75,0.30)"
+        bar_pct = int(score)
+        bar_color = "#F0A04B"
+    elif score >= 30:
+        headline = "🌤️ Slight Risk — possible tight days ahead"
+        weather_color = "#6FA8C0"
+        bg_color = "rgba(111,168,192,0.10)"
+        border_color = "rgba(178,213,229,0.40)"
+        bar_pct = int(score)
+        bar_color = "#6FA8C0"
+    else:
+        headline = "☀️ Sunny — cash flow is healthy"
+        weather_color = "#5BB896"
+        bg_color = "rgba(91,184,150,0.10)"
+        border_color = "rgba(91,184,150,0.30)"
+        bar_pct = int(score)
+        bar_color = "#5BB896"
+
+    st.markdown(f"""
+    <div style="display:flex;align-items:center;gap:1.2rem;
+                padding:1rem 1.3rem;
+                background:{bg_color};
+                border:1.5px solid {border_color};
+                border-radius:16px;
+                margin-bottom:0.2rem;">
+        <div style="font-size:2.4rem;line-height:1;">{headline.split()[0]}</div>
+        <div style="flex:1;">
+            <div style="font-size:1.0rem;font-weight:700;color:{weather_color};letter-spacing:-0.01em;">
+                {headline}
+            </div>
+            <div style="margin-top:6px;background:rgba(0,0,0,0.08);border-radius:6px;height:5px;width:100%;">
+                <div style="width:{bar_pct}%;height:5px;border-radius:6px;
+                            background:{bar_color};transition:width 0.4s;"></div>
+            </div>
+            <div style="font-size:0.73rem;color:#8FA8B8;margin-top:4px;">
+                Risk score: {score}/100
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION: AI CASH FLOW STORY CARD
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_cash_flow_story(summary_df: "pd.DataFrame | None", risk_data: dict | None, forecast_df: "pd.DataFrame | None"):
+    """Gemini-generated 3–4 sentence narrative — reuses existing Gemini client setup."""
+    # ── Derive context from existing loaded data ──
+    score, _, badge_lbl, _, expl = compute_dynamic_risk(risk_data, forecast_df)
+
+    total_income = 0.0
+    total_expense = 0.0
+    top_category = "Misc"
+    if summary_df is not None:
+        if "Income" in summary_df.columns:
+            total_income = float(summary_df["Income"].sum())
+        if "total_spend" in summary_df.columns:
+            total_expense = float(summary_df["total_spend"].sum())
+        cat_cols = [c for c in ["Food","Hardware","Misc","Rent","Software"] if c in summary_df.columns]
+        if cat_cols:
+            top_category = summary_df[cat_cols].sum().idxmax()
+
+    # First negative forecast day (if any)
+    negative_day = None
+    if forecast_df is not None and "projected_balance" in forecast_df.columns and "date" in forecast_df.columns:
+        neg_rows = forecast_df[forecast_df["projected_balance"] < 0]
+        if not neg_rows.empty:
+            negative_day = neg_rows.iloc[0]["date"]
+
+    negative_day_str = f"The first projected negative balance falls on {negative_day}." if negative_day else "No negative balance is projected in the 30-day window."
+
+    # ── Gemini API key (exact same pattern as render_insight_panel) ──
+    api_key = None
+    try:
+        if hasattr(st, "secrets") and st.secrets:
+            if "GEMINI_API_KEY" in st.secrets:
+                api_key = str(st.secrets["GEMINI_API_KEY"])
+            elif "secrets" in st.secrets and "GEMINI_API_KEY" in st.secrets["secrets"]:
+                api_key = str(st.secrets["secrets"]["GEMINI_API_KEY"])
+    except Exception:
+        api_key = None
+
+    story_text = None
+    if GEMINI_SDK_AVAILABLE and api_key and api_key.strip() and api_key.strip() != "YOUR_GEMINI_API_KEY_HERE":
+        try:
+            _client = genai_sdk.Client(api_key=api_key.strip())
+            prompt = f"""You are a friendly personal finance assistant. Write a 3-4 sentence narrative summary of this person's cash flow situation in plain, conversational language — no bullet points, no headers.
+
+Financial context:
+- Total income tracked: ${total_income:,.0f}
+- Total expenses tracked: ${total_expense:,.0f}
+- Biggest expense category: {top_category}
+- Cash-flow risk score: {score}/100 ({badge_lbl})
+- Risk explanation: {expl}
+- Forecast note: {negative_day_str}
+
+Keep it warm, honest, and actionable. Do not use bullet points."""
+            res = _client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+            story_text = res.text.strip()
+        except Exception:
+            story_text = None
+
+    # ── Fallback f-string narrative (always has real numbers) ──
+    if story_text is None:
+        net = total_income - total_expense
+        net_str = f"a net {'surplus' if net >= 0 else 'deficit'} of ${abs(net):,.0f}"
+        story_text = (
+            f"Over the tracked period, your portfolio recorded ${total_income:,.0f} in income against "
+            f"${total_expense:,.0f} in expenses, leaving {net_str}. "
+            f"Your biggest spend area is {top_category}, which is worth keeping an eye on. "
+            f"With a risk score of {score}/100 ({badge_lbl}), your cash flow is {badge_lbl.lower()} right now. "
+            f"{negative_day_str}"
+        )
+
+    st.markdown(f"""
+    <div style="padding:0 0 0.6rem 0;">
+        <div style="font-size:0.72rem;font-weight:700;color:#6FA8C0;text-transform:uppercase;
+                    letter-spacing:0.07em;margin-bottom:0.5rem;">📖 Your Cash Flow Story</div>
+        <div style="font-size:0.88rem;line-height:1.65;color:#2C3E50;">
+            {story_text}
+        </div>
+        <div style="font-size:0.68rem;color:#B0C4D0;margin-top:0.6rem;text-align:right;">
+            ✨ {'AI-generated by Gemini' if (GEMINI_SDK_AVAILABLE and api_key and story_text) else 'Smart summary'}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION: HIDDEN MONEY FINDER CARD
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_hidden_money_finder(anomalies_df: "pd.DataFrame | None"):
+    """Surfaces anomalies reframed as savings opportunities — reuses anomalies_df, no re-detection."""
+    if anomalies_df is None or anomalies_df.empty:
+        st.markdown("""
+        <div style="padding:1rem;text-align:center;color:#8FA8B8;font-size:0.85rem;">
+            💰 No anomalies detected yet — your spending looks clean!
+        </div>""", unsafe_allow_html=True)
+        return
+
+    df = anomalies_df.copy()
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0)
+    df["abs_amount"] = df["amount"].abs()
+
+    # Classify each row: "duplicate" if reason contains duplicate, else "vendor_spike"
+    def _classify(reason: str) -> str:
+        r = str(reason).lower()
+        if "duplicate" in r:
+            return "duplicate"
+        return "vendor_spike"
+
+    df["anom_type"] = df["reason"].apply(_classify)
+
+    # Savings calculation per spec:
+    # - duplicate: full amount
+    # - vendor_spike: 30% of amount as "delta above baseline" estimate (no baseline column exists)
+    dup_df = df[df["anom_type"] == "duplicate"]
+    spike_df = df[df["anom_type"] == "vendor_spike"]
+
+    dup_savings = dup_df["abs_amount"].sum()
+    spike_savings = (spike_df["abs_amount"] * 0.30).sum()
+    total_savings = dup_savings + spike_savings
+
+    # Build human-readable finding lines
+    findings = []
+    for _, row in df.iterrows():
+        merchant = str(row.get("merchant", "Unknown vendor")).replace("_", " ").title()
+        date_str = str(row.get("date", ""))
+        amt = row["abs_amount"]
+        cat = str(row.get("category", ""))
+        if row["anom_type"] == "duplicate":
+            findings.append(f"<li><b>{merchant}</b> charged twice on {date_str} — possible duplicate, <b>${amt:,.2f}</b></li>")
+        else:
+            above = amt * 0.30
+            findings.append(f"<li><b>{merchant}</b> ({cat}) on {date_str} — unusually high, ~<b>${above:,.2f}</b> above typical spend</li>")
+
+    findings_html = "<ul style='margin:0.5rem 0 0 0;padding-left:1.2rem;'>" + "".join(findings) + "</ul>"
+
+    st.markdown(f"""
+    <div>
+        <div style="font-size:0.72rem;font-weight:700;color:#6FA8C0;text-transform:uppercase;
+                    letter-spacing:0.07em;margin-bottom:0.5rem;">💰 Hidden Money Finder</div>
+        <div style="font-size:1.35rem;font-weight:800;color:#5BB896;letter-spacing:-0.02em;margin-bottom:0.2rem;">
+            We found ${total_savings:,.2f} you could save this month
+        </div>
+        <div style="font-size:0.82rem;color:#2C3E50;line-height:1.7;">
+            {findings_html}
+        </div>
+        <div style="font-size:0.7rem;color:#B0C4D0;margin-top:0.7rem;">
+            Based on {len(df)} flagged transaction{'s' if len(df) != 1 else ''} · Duplicates refundable · Spike savings estimated at 30% above baseline
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None, forecast_df: pd.DataFrame | None, anomalies_df: pd.DataFrame | None):
+    # Extract financial context from existing loaded data objects
+    curr_bal = float(summary_df["running_balance"].dropna().iloc[-1]) if summary_df is not None and "running_balance" in summary_df.columns and not summary_df["running_balance"].dropna().empty else 0.0
+    score, badge_cls, badge_lbl, score_color, expl = compute_dynamic_risk(risk_data, forecast_df)
+    min_proj = float(forecast_df["projected_balance"].min()) if forecast_df is not None and "projected_balance" in forecast_df.columns and not forecast_df.empty else curr_bal
+    
+    fc_snippet = forecast_df[["date", "projected_balance"]].head(3).to_string(index=False) if forecast_df is not None and not forecast_df.empty else "N/A"
+    anom_snippet = anomalies_df[["date", "merchant", "amount", "reason"]].head(4).to_string(index=False) if anomalies_df is not None and not anomalies_df.empty else "None"
+
+    with st.container(border=True):
+        col_hdr, col_badge = st.columns([1, 0.4])
+        with col_hdr:
+            st.markdown(section_header("CashFlow Insight", "🤖"), unsafe_allow_html=True)
+        with col_badge:
+            st.markdown(
+                '<div style="text-align:right;margin-top:2px;">'
+                '<span style="font-size:0.72rem;background:rgba(178,213,229,0.25);color:#1D1D1D;'
+                'padding:3px 10px;border-radius:12px;border:1px solid rgba(178,213,229,0.4);font-weight:500;">'
+                '✨ Powered by Gemini</span></div>',
+                unsafe_allow_html=True
+            )
+
+        user_query = st.text_input(
+            "Ask your AI Financial Advisor",
+            value="Can I afford a $500 laptop next month?",
+            placeholder="e.g. Can I afford a $500 laptop next month? or What should I watch out for?",
+            key="insight_user_input"
+        )
+
+        if user_query:
+            api_key = None
+            try:
+                if hasattr(st, "secrets") and st.secrets:
+                    if "GEMINI_API_KEY" in st.secrets:
+                        api_key = str(st.secrets["GEMINI_API_KEY"])
+                    elif "secrets" in st.secrets and "GEMINI_API_KEY" in st.secrets["secrets"]:
+                        api_key = str(st.secrets["secrets"]["GEMINI_API_KEY"])
+            except Exception:
+                api_key = None
+
+            insight_answer = None  # always initialise before try block
+            gemini_error   = None
+
+            if GEMINI_SDK_AVAILABLE and api_key and api_key.strip() and api_key.strip() != "YOUR_GEMINI_API_KEY_HERE":
+                try:
+                    with st.spinner("🤖 Thinking with Gemini 2.0 Flash..."):
+                        _client = genai_sdk.Client(api_key=api_key.strip())
+                        prompt = f"""You are CashFlow Insight, an AI financial advisor for CashFlow Radar.
+Answer the user's question grounded ONLY in the financial context provided below.
+Provide a clear, direct answer in 2 to 3 sentences in plain language.
+
+[FINANCIAL CONTEXT]
+- Current Portfolio Balance: {fmt_curr(curr_bal)}
+- Cash-Flow Risk Score: {score}/100 ({badge_lbl}) — {expl}
+- 30-Day Projected Balance (Next 3 Days):
+{fc_snippet}
+- Recent Flagged Anomalies:
+{anom_snippet}
+
+[USER QUESTION]
+"{user_query}"
+"""
+                        res = _client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+                        insight_answer = res.text.strip()
+                except Exception as e:
+                    gemini_error = str(e)
+                    insight_answer = None  # will use fallback below
+
+            # Use fallback if Gemini wasn't called or failed
+            if insight_answer is None:
+                insight_answer = generate_insight_fallback(user_query, curr_bal, score, badge_lbl, expl, min_proj)
+
+            # Show Gemini error banner if the API call failed
+            if gemini_error:
+                st.warning(f"⚠️ Gemini API error — showing rule-based answer instead. Error: `{gemini_error[:200]}`")
+
+            st.markdown(f"""
+            <div style="margin-top:0.8rem;padding:0.9rem 1.1rem;background:rgba(178,213,229,0.12);
+                        border:1px solid rgba(178,213,229,0.35);border-radius:12px;font-size:0.86rem;
+                        line-height:1.55;color:#1D1D1D;">
+                <div style="font-weight:600;color:#6FA8C0;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.3rem;">💡 CashFlow Insight Response</div>
+                {insight_answer}
+            </div>""", unsafe_allow_html=True)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -767,7 +1332,7 @@ def render_kpi_strip(summary_df: pd.DataFrame | None, risk_data: dict | None):
     # KPI 2: Current balance (last row of daily_summary)
     if summary_df is not None and "running_balance" in summary_df.columns:
         last_bal = summary_df["running_balance"].dropna().iloc[-1] if len(summary_df) > 0 else 0
-        bal_str = f"${last_bal:,.0f}"
+        bal_str = fmt_curr(last_bal)
         bal_dir = "up" if last_bal > 0 else "down"
         bal_delta = "Positive" if last_bal > 0 else "Negative"
     else:
@@ -779,20 +1344,28 @@ def render_kpi_strip(summary_df: pd.DataFrame | None, risk_data: dict | None):
             icon_bg="rgba(91,184,150,0.18)"
         ), unsafe_allow_html=True)
 
-    # KPI 3: Monthly spend change
+    # KPI 3: Monthly spend change (normalized per calendar month)
     if summary_df is not None and "total_spend" in summary_df.columns:
         df_tmp = summary_df.copy()
         df_tmp["date"] = pd.to_datetime(df_tmp["date"])
         df_tmp = df_tmp.sort_values("date")
-        if len(df_tmp) >= 60:
-            prev_30 = df_tmp.iloc[-60:-30]["total_spend"].sum()
-            last_30 = df_tmp.iloc[-30:]["total_spend"].sum()
-            pct_change = ((last_30 - prev_30) / max(prev_30, 1)) * 100
+        df_tmp["month"] = df_tmp["date"].dt.to_period("M")
+        m_grouped = df_tmp.groupby("month")
+        if len(m_grouped) >= 2:
+            months = list(m_grouped.groups.keys())
+            prev_df = m_grouped.get_group(months[-2])
+            curr_df = m_grouped.get_group(months[-1])
+            prev_daily = prev_df["total_spend"].sum() / max(len(prev_df), 1)
+            curr_daily = curr_df["total_spend"].sum() / max(len(curr_df), 1)
+            pct_change = ((curr_daily - prev_daily) / max(prev_daily, 0.01)) * 100
             chg_str   = f"{pct_change:+.1f}%"
             chg_dir   = "down" if pct_change > 0 else "up"   # more spend = bad
-            chg_delta = "vs prior 30d"
+            chg_delta = "vs prior month"
+        elif len(df_tmp) >= 30:
+            avg_daily = df_tmp["total_spend"].mean()
+            chg_str, chg_dir, chg_delta = f"{fmt_curr(avg_daily*30.4)}/mo", "flat", "monthly avg"
         else:
-            chg_str, chg_dir, chg_delta = "N/A", "flat", "< 60 days data"
+            chg_str, chg_dir, chg_delta = "N/A", "flat", "< 30 days data"
     else:
         chg_str, chg_dir, chg_delta = "—", "flat", ""
     with cols[2]:
@@ -805,7 +1378,7 @@ def render_kpi_strip(summary_df: pd.DataFrame | None, risk_data: dict | None):
     # KPI 4: Avg daily spend
     if summary_df is not None and "total_spend" in summary_df.columns:
         avg_spend = summary_df["total_spend"].mean()
-        avg_str   = f"${avg_spend:,.0f}"
+        avg_str   = fmt_curr(avg_spend)
         avg_delta = "per day (avg)"
     else:
         avg_str, avg_delta = "—", ""
@@ -834,16 +1407,17 @@ def render_hero_and_risk(summary_df: pd.DataFrame | None, risk_data: dict | None
             last_date  = df_s["date"].iloc[-1].strftime("%b %d, %Y")
             last_spend = float(df_s["total_spend"].iloc[-1]) if "total_spend" in df_s.columns else 0
             bal_color  = "#5BB896" if last_bal > 0 else "#E07070"
+            sym = get_currency_symbol()
 
             st.markdown(f"""
             <div class="hero-card">
                 <div class="hero-label">Total Portfolio Balance</div>
-                <div class="hero-amount" style="color:{bal_color}">${abs(last_bal):,.2f}</div>
-                <div class="hero-sub">{'Available Now' if last_bal > 0 else 'Deficit — Action Required'} &nbsp;•&nbsp; 🔵 USD</div>
+                <div class="hero-amount" style="color:{bal_color}">{fmt_curr(last_bal, 2)}</div>
+                <div class="hero-sub">{'Available Now' if last_bal > 0 else 'Deficit — Action Required'} &nbsp;•&nbsp; {sym}</div>
                 <div style="margin-top:1.2rem;">
                     <span class="hero-badge">🕐 Last updated: {last_date}</span>
                     &nbsp;&nbsp;
-                    <span class="hero-badge">📤 Daily spend: ${last_spend:,.0f}</span>
+                    <span class="hero-badge">📤 Daily spend: {fmt_curr(last_spend)}</span>
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -866,7 +1440,7 @@ def render_hero_and_risk(summary_df: pd.DataFrame | None, risk_data: dict | None
                     x=fc["date"], y=fc["projected_balance"],
                     mode="lines",
                     line=dict(color=DEEP_BLUE, width=2.5, shape="spline"),
-                    showlegend=False, hovertemplate="$%{y:,.0f}<extra></extra>"
+                    showlegend=False, hovertemplate=f"{sym}%{{y:,.0f}}<extra></extra>"
                 ))
                 fig_spark.update_layout(
                     height=90, margin=dict(l=0, r=0, t=12, b=0),
@@ -881,11 +1455,7 @@ def render_hero_and_risk(summary_df: pd.DataFrame | None, risk_data: dict | None
     # ── Risk Score Card ──
     with col_risk:
         if risk_data is not None:
-            score = float(risk_data.get("score", 50))
-            expl  = risk_data.get("explanation", "")
-            if   score < 40:  badge_cls, badge_lbl, score_color = "low",    "Healthy",      "#5BB896"
-            elif score < 70: badge_cls, badge_lbl, score_color = "medium", "Moderate Risk", "#F0A04B"
-            else:            badge_cls, badge_lbl, score_color = "high",   "High Risk",     "#E07070"
+            score, badge_cls, badge_lbl, score_color, expl = compute_dynamic_risk(risk_data, forecast_df)
 
             # Semi-circular gauge
             if PLOTLY_AVAILABLE:
@@ -913,14 +1483,14 @@ def render_hero_and_risk(summary_df: pd.DataFrame | None, risk_data: dict | None
                     plot_bgcolor="rgba(0,0,0,0)",
                     font={"family": "Inter"},
                 )
-                st.markdown('<div class="risk-card">', unsafe_allow_html=True)
-                st.markdown(f'<div class="section-header"><span class="dot" style="background:#E5BDDF;"></span>Cash-Flow Risk Score</div>', unsafe_allow_html=True)
-                st.plotly_chart(fig_gauge, width="stretch", config={"displayModeBar": False})
-                st.markdown(f'<div style="text-align:center;"><span class="risk-badge {badge_cls}">{badge_lbl}</span></div>', unsafe_allow_html=True)
-                st.markdown(f'<div style="font-size:0.75rem;color:#8FA8B8;text-align:center;margin-top:0.7rem;line-height:1.5;">{expl[:160]}{"…" if len(expl) > 160 else ""}</div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container(border=True):
+                    st.markdown(f'<div class="section-header"><span class="dot" style="background:#E5BDDF;"></span>Cash-Flow Risk Score</div>', unsafe_allow_html=True)
+                    st.plotly_chart(fig_gauge, width="stretch", config={"displayModeBar": False})
+                    st.markdown(f'<div style="text-align:center;"><span class="risk-badge {badge_cls}">{badge_lbl}</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-size:0.75rem;color:#8FA8B8;text-align:center;margin-top:0.7rem;line-height:1.5;">{expl[:160]}{"…" if len(expl) > 160 else ""}</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="risk-card">' + no_data("🛡️", "No Risk Score", "Drop `risk_score.json` into `./data/`") + '</div>', unsafe_allow_html=True)
+            with st.container(border=True):
+                st.markdown(no_data("🛡️", "No Risk Score", "Drop `risk_score.json` into `./data/`"), unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -935,11 +1505,12 @@ def render_forecast(forecast_df: pd.DataFrame | None):
         return
 
     fc = forecast_df.copy()
-    fc["date"] = pd.to_datetime(fc["date"])
-
+    sb_val = int(get_safety_buffer())
+    sym = get_currency_symbol()
     safety_buffer = st.slider(
-        "Safety Buffer ($)", min_value=0, max_value=10000, value=2000, step=500,
-        help="Minimum balance threshold — shown as a reference line on the chart"
+        f"Safety Buffer ({sym})", min_value=0, max_value=10000, value=sb_val, step=500,
+        help="Minimum balance threshold — shown as a reference line on the chart",
+        key="fc_safety_slider"
     )
 
     if PLOTLY_AVAILABLE:
@@ -955,7 +1526,7 @@ def render_forecast(forecast_df: pd.DataFrame | None):
             fill="tonexty",
             fillcolor="rgba(178,213,229,0.22)",
             name="Confidence Band",
-            hovertemplate="Lower: $%{y:,.0f}<extra></extra>"
+            hovertemplate=f"Lower: {sym}%{{y:,.0f}}<extra></extra>"
         ))
         # Main projected line
         fig.add_trace(go.Scatter(
@@ -964,13 +1535,13 @@ def render_forecast(forecast_df: pd.DataFrame | None):
             line=dict(color=DEEP_BLUE, width=3, shape="spline"),
             marker=dict(size=5, color=ORCHID, line=dict(color=DEEP_BLUE, width=1.5)),
             name="Projected Balance",
-            hovertemplate="<b>%{x|%b %d}</b><br>$%{y:,.0f}<extra></extra>"
+            hovertemplate=f"<b>%{{x|%b %d}}</b><br>{sym}%{{y:,.0f}}<extra></extra>"
         ))
         # Safety buffer line
         fig.add_hline(
             y=safety_buffer,
             line_dash="dot", line_color="#E07070", line_width=1.8,
-            annotation_text=f"  Safety Buffer ${safety_buffer:,}",
+            annotation_text=f"  Safety Buffer {fmt_curr(safety_buffer)}",
             annotation_font=dict(size=11, color="#E07070"),
             annotation_position="top left"
         )
@@ -990,7 +1561,7 @@ def render_forecast(forecast_df: pd.DataFrame | None):
                 showgrid=True, gridcolor="rgba(178,213,229,0.20)",
                 zeroline=False, showline=False,
                 tickfont=dict(family="Inter", size=11, color=SLATE),
-                tickprefix="$", tickformat=",.0f"
+                tickprefix=sym, tickformat=",.0f"
             ),
         )
         st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
@@ -1513,9 +2084,7 @@ def render_view_transactions(summary_df: pd.DataFrame | None, anomalies_df: pd.D
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render_view_analytics(summary_df: pd.DataFrame | None):
-    st.markdown(section_header("Analytics", "📈"), unsafe_allow_html=True)
-
-    if summary_df is None:
+    if summary_df is None or summary_df.empty:
         st.markdown(no_data("📈", "No Data", "Drop `daily_summary.csv` into `./data/`"), unsafe_allow_html=True)
         return
 
@@ -1538,74 +2107,72 @@ def render_view_analytics(summary_df: pd.DataFrame | None):
     col_mom, col_cat = st.columns([1.4, 1], gap="large")
 
     with col_mom:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown(section_header("Monthly Spend Trend", "📅"), unsafe_allow_html=True)
-        if "total_spend" in df.columns:
-            df["month_str"] = df["date"].dt.to_period("M").dt.strftime("%b %Y")
-            monthly = df.groupby("month_str", sort=False)["total_spend"].sum().reset_index()
-            # Re-sort chronologically
-            monthly["_sort"] = pd.to_datetime(monthly["month_str"], format="%b %Y")
-            monthly = monthly.sort_values("_sort").drop(columns=["_sort"])
-            if PLOTLY_AVAILABLE:
-                bar_colors = []
-                for i in range(len(monthly)):
-                    if i == 0:
-                        bar_colors.append(CANDY_BLUE)
-                    elif monthly["total_spend"].iloc[i] <= monthly["total_spend"].iloc[i - 1]:
-                        bar_colors.append(SUCCESS)
-                    else:
-                        bar_colors.append(DANGER)
-                fig_mom = go.Figure(go.Bar(
-                    x=monthly["month_str"], y=monthly["total_spend"],
-                    marker_color=bar_colors,
-                    text=monthly["total_spend"].apply(lambda x: f"${x:,.0f}"),
-                    textposition="outside", textfont=dict(family="Inter", size=10),
-                    hovertemplate="<b>%{x}</b><br>$%{y:,.0f}<extra></extra>",
-                ))
-                fig_mom.update_layout(
-                    height=260, margin=dict(l=10, r=10, t=30, b=10),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    xaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=11, color=SLATE)),
-                    yaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
-                               tickprefix="$", tickformat=",.0f",
-                               tickfont=dict(family="Inter", size=11, color=SLATE), zeroline=False),
-                    showlegend=False,
-                )
-                st.plotly_chart(fig_mom, use_container_width=True, config={"displayModeBar": False})
+        with st.container(border=True):
+            st.markdown(section_header("Monthly Spend Trend", "📅"), unsafe_allow_html=True)
+            if "total_spend" in df.columns:
+                df["month_str"] = df["date"].dt.to_period("M").dt.strftime("%b %Y")
+                monthly = df.groupby("month_str", sort=False)["total_spend"].sum().reset_index()
+                # Re-sort chronologically
+                monthly["_sort"] = pd.to_datetime(monthly["month_str"], format="%b %Y")
+                monthly = monthly.sort_values("_sort").drop(columns=["_sort"])
+                if PLOTLY_AVAILABLE:
+                    bar_colors = []
+                    for i in range(len(monthly)):
+                        if i == 0:
+                            bar_colors.append(CANDY_BLUE)
+                        elif monthly["total_spend"].iloc[i] <= monthly["total_spend"].iloc[i - 1]:
+                            bar_colors.append(SUCCESS)
+                        else:
+                            bar_colors.append(DANGER)
+                    fig_mom = go.Figure(go.Bar(
+                        x=monthly["month_str"], y=monthly["total_spend"],
+                        marker_color=bar_colors,
+                        text=monthly["total_spend"].apply(lambda x: f"${x:,.0f}"),
+                        textposition="outside", textfont=dict(family="Inter", size=10),
+                        hovertemplate="<b>%{x}</b><br>$%{y:,.0f}<extra></extra>",
+                    ))
+                    fig_mom.update_layout(
+                        height=260, margin=dict(l=10, r=10, t=30, b=10),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                        xaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=11, color=SLATE)),
+                        yaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
+                                   tickprefix="$", tickformat=",.0f",
+                                   tickfont=dict(family="Inter", size=11, color=SLATE), zeroline=False),
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig_mom, use_container_width=True, config={"displayModeBar": False})
+                else:
+                    st.bar_chart(monthly.set_index("month_str")["total_spend"])
             else:
-                st.bar_chart(monthly.set_index("month_str")["total_spend"])
-        else:
-            st.info("No `total_spend` column found.")
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.info("No `total_spend` column found.")
 
     with col_cat:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown(section_header("Category Ranking", "🏆"), unsafe_allow_html=True)
-        if cat_cols:
-            totals_s = pd.Series({c: df[c].sum() for c in cat_cols}).sort_values(ascending=True)
-            if PLOTLY_AVAILABLE:
-                fig_cat = go.Figure(go.Bar(
-                    x=totals_s.values, y=totals_s.index, orientation="h",
-                    marker_color=palette[:len(totals_s)],
-                    text=[f"${v:,.0f}" for v in totals_s.values],
-                    textposition="inside", textfont=dict(family="Inter", size=10, color="white"),
-                    hovertemplate="%{y}: $%{x:,.0f}<extra></extra>",
-                ))
-                fig_cat.update_layout(
-                    height=260, margin=dict(l=10, r=10, t=10, b=10),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    xaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
-                               tickprefix="$", tickformat=",.0f",
-                               tickfont=dict(family="Inter", size=10, color=SLATE), zeroline=False),
-                    yaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=10, color=ONYX)),
-                    showlegend=False,
-                )
-                st.plotly_chart(fig_cat, use_container_width=True, config={"displayModeBar": False})
+        with st.container(border=True):
+            st.markdown(section_header("Category Ranking", "🏆"), unsafe_allow_html=True)
+            if cat_cols:
+                totals_s = pd.Series({c: df[c].sum() for c in cat_cols}).sort_values(ascending=True)
+                if PLOTLY_AVAILABLE:
+                    fig_cat = go.Figure(go.Bar(
+                        x=totals_s.values, y=totals_s.index, orientation="h",
+                        marker_color=palette[:len(totals_s)],
+                        text=[f"${v:,.0f}" for v in totals_s.values],
+                        textposition="inside", textfont=dict(family="Inter", size=10, color="white"),
+                        hovertemplate="%{y}: $%{x:,.0f}<extra></extra>",
+                    ))
+                    fig_cat.update_layout(
+                        height=260, margin=dict(l=10, r=10, t=10, b=10),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                        xaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
+                                   tickprefix="$", tickformat=",.0f",
+                                   tickfont=dict(family="Inter", size=10, color=SLATE), zeroline=False),
+                        yaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=10, color=ONYX)),
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig_cat, use_container_width=True, config={"displayModeBar": False})
+                else:
+                    st.bar_chart(pd.DataFrame({"Total": totals_s}))
             else:
-                st.bar_chart(pd.DataFrame({"Total": totals_s}))
-        else:
-            st.info("No category columns detected.")
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.info("No category columns detected.")
 
     st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
 
@@ -1613,61 +2180,59 @@ def render_view_analytics(summary_df: pd.DataFrame | None):
     col_hi, col_roll = st.columns([1, 1.5], gap="large")
 
     with col_hi:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown(section_header("Spending Highlights", "⚡"), unsafe_allow_html=True)
-        if "total_spend" in df.columns and len(df) > 0:
-            max_idx   = df["total_spend"].idxmax()
-            min_idx   = df["total_spend"].idxmin()
-            max_day   = df.loc[max_idx, "date"].strftime("%B %d, %Y")
-            max_spend = df.loc[max_idx, "total_spend"]
-            min_day   = df.loc[min_idx, "date"].strftime("%B %d, %Y")
-            min_spend = df.loc[min_idx, "total_spend"]
-            avg_spend = df["total_spend"].mean()
-            for ic, lb, vl, sb in [
-                ("🔥", "Highest Spend Day", f"${max_spend:,.0f}", max_day),
-                ("💚", "Lowest Spend Day",  f"${min_spend:,.0f}", min_day),
-                ("📊", "Daily Average",     f"${avg_spend:,.0f}", f"Over {len(df)} days"),
-            ]:
-                st.markdown(f"""
-                <div class="callout-box">
-                    <div class="callout-icon">{ic}</div>
-                    <div>
-                        <div class="callout-label">{lb}</div>
-                        <div class="callout-value">{vl}</div>
-                        <div class="callout-sub">{sb}</div>
+        with st.container(border=True):
+            st.markdown(section_header("Spending Highlights", "⚡"), unsafe_allow_html=True)
+            if "total_spend" in df.columns and len(df) > 0:
+                max_idx   = df["total_spend"].idxmax()
+                min_idx   = df["total_spend"].idxmin()
+                max_day   = df.loc[max_idx, "date"].strftime("%B %d, %Y")
+                max_spend = df.loc[max_idx, "total_spend"]
+                min_day   = df.loc[min_idx, "date"].strftime("%B %d, %Y")
+                min_spend = df.loc[min_idx, "total_spend"]
+                avg_spend = df["total_spend"].mean()
+                for ic, lb, vl, sb in [
+                    ("🔥", "Highest Spend Day", f"${max_spend:,.0f}", max_day),
+                    ("💚", "Lowest Spend Day",  f"${min_spend:,.0f}", min_day),
+                    ("📊", "Daily Average",     f"${avg_spend:,.0f}", f"Over {len(df)} days"),
+                ]:
+                    st.markdown(f"""
+                    <div class="callout-box">
+                        <div class="callout-icon">{ic}</div>
+                        <div>
+                            <div class="callout-label">{lb}</div>
+                            <div class="callout-value">{vl}</div>
+                            <div class="callout-sub">{sb}</div>
+                        </div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
     with col_roll:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        roll_lbl = "7-Day Rolling Spend" if "rolling_7d_spend" in df.columns else "Daily Spend Trend"
-        st.markdown(section_header(roll_lbl, "📉"), unsafe_allow_html=True)
-        roll_col = ("rolling_7d_spend" if "rolling_7d_spend" in df.columns
-                    else ("total_spend" if "total_spend" in df.columns else None))
-        if roll_col and PLOTLY_AVAILABLE:
-            roll_df = df[["date", roll_col]].dropna()
-            fig_roll = go.Figure(go.Scatter(
-                x=roll_df["date"], y=roll_df[roll_col],
-                mode="lines",
-                line=dict(color=ORCHID, width=2.5, shape="spline"),
-                fill="tozeroy", fillcolor="rgba(229,189,223,0.12)",
-                hovertemplate="<b>%{x|%b %d}</b><br>$%{y:,.0f}<extra></extra>"
-            ))
-            fig_roll.update_layout(
-                height=300, margin=dict(l=10, r=10, t=10, b=10),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                showlegend=False,
-                xaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=11, color=SLATE)),
-                yaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
-                           tickprefix="$", tickformat=",.0f",
-                           tickfont=dict(family="Inter", size=11, color=SLATE), zeroline=False),
-            )
-            st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": False})
-        elif roll_col:
-            st.line_chart(df.set_index("date")[roll_col])
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            roll_lbl = "7-Day Rolling Spend" if "rolling_7d_spend" in df.columns else "Daily Spend Trend"
+            st.markdown(section_header(roll_lbl, "📉"), unsafe_allow_html=True)
+            roll_col = ("rolling_7d_spend" if "rolling_7d_spend" in df.columns
+                        else ("total_spend" if "total_spend" in df.columns else None))
+            if roll_col and PLOTLY_AVAILABLE:
+                roll_df = df[["date", roll_col]].dropna()
+                fig_roll = go.Figure(go.Scatter(
+                    x=roll_df["date"], y=roll_df[roll_col],
+                    mode="lines",
+                    line=dict(color=ORCHID, width=2.5, shape="spline"),
+                    fill="tozeroy", fillcolor="rgba(229,189,223,0.12)",
+                    hovertemplate="<b>%{x|%b %d}</b><br>$%{y:,.0f}<extra></extra>"
+                ))
+                fig_roll.update_layout(
+                    height=300, margin=dict(l=10, r=10, t=10, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    showlegend=False,
+                    xaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=11, color=SLATE)),
+                    yaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
+                               tickprefix="$", tickformat=",.0f",
+                               tickfont=dict(family="Inter", size=11, color=SLATE), zeroline=False),
+                )
+                st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": False})
+            elif roll_col:
+                st.line_chart(df.set_index("date")[roll_col])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1675,16 +2240,12 @@ def render_view_analytics(summary_df: pd.DataFrame | None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render_view_budgets(summary_df: pd.DataFrame | None):
-    st.markdown(section_header("Budgets", "🎯"), unsafe_allow_html=True)
-
-    if summary_df is None:
+    if summary_df is None or summary_df.empty:
         st.markdown(no_data("🎯", "No Budget Data", "Drop `daily_summary.csv` into `./data/`"), unsafe_allow_html=True)
         return
 
-    df = summary_df.copy()
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.sort_values("date")
 
+    df = summary_df.copy()
     meta = {"date", "total_spend", "running_balance", "rolling_7d_spend", "rolling_30d_spend"}
     cat_cols = [c for c in df.columns
                 if c not in meta
@@ -1695,169 +2256,695 @@ def render_view_budgets(summary_df: pd.DataFrame | None):
         st.warning("No category columns detected in `daily_summary.csv`.")
         return
 
-    st.markdown("""
-    <div style="display:flex;align-items:flex-start;gap:10px;padding:0.8rem 1rem;
-                background:rgba(178,213,229,0.10);border:1px solid rgba(178,213,229,0.30);
-                border-radius:10px;font-size:0.82rem;color:#6FA8C0;margin-bottom:1.4rem;">
-        💡 <span><b>Auto-suggested budgets</b> are computed from your historical daily average × 30.4 days.
-        This reflects your actual spend pattern — it is not a user-configured budget.</span>
-    </div>
-    """, unsafe_allow_html=True)
+    days = len(df) if len(df) > 0 else 30
+    actual_monthly = {cat: (df[cat].sum() / days * 30.4) for cat in cat_cols}
+    default_targets = {"Food": 1500, "Hardware": 2000, "Software": 1200, "Rent": 2500, "Misc": 1000}
+    cat_icons = {"Food": "🍔", "Software": "💻", "Hardware": "🖥️", "Rent": "🏠", "Misc": "📦"}
+    sym = get_currency_symbol()
 
-    # Compute suggested (historical avg × 30.4) and actual (last 30 days)
-    last_30   = df.tail(30)
-    suggested = {c: df[c].mean() * 30.4 for c in cat_cols}
-    actual_30 = {c: last_30[c].sum()     for c in cat_cols}
-
-    total_sug = sum(suggested.values())
-    total_act = sum(actual_30.values())
-    util_pct  = (total_act / total_sug * 100) if total_sug > 0 else 0
-
-    kc1, kc2, kc3 = st.columns(3, gap="small")
-    for col, lbl, val, delta, ddir, ic, bg in [
-        (kc1, "Suggested Monthly",  f"${total_sug:,.0f}", "Historical avg × 30.4d", "flat",                                     "🎯", "rgba(178,213,229,0.25)"),
-        (kc2, "Actual Last 30 Days", f"${total_act:,.0f}", "All categories",         "down" if total_act > total_sug else "flat", "💳", "rgba(240,160,75,0.18)"),
-        (kc3, "Budget Utilization",  f"{util_pct:.0f}%",   "vs suggested",           "down" if util_pct > 100 else "up",          "📊", "rgba(91,184,150,0.18)"),
-    ]:
-        with col:
-            st.markdown(kpi_html(lbl, val, delta, ddir, ic, bg), unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:1.2rem;'></div>", unsafe_allow_html=True)
-
-    col_bars, col_chart = st.columns([1.1, 1], gap="large")
-
-    with col_bars:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown(section_header("Actual vs Suggested per Category", "📊"), unsafe_allow_html=True)
-        for cat in sorted(cat_cols, key=lambda c: actual_30[c], reverse=True):
-            sug = suggested[cat]
-            act = actual_30[cat]
-            if sug <= 0:
-                continue
-            pct       = act / sug * 100
-            over      = pct > 100
-            bar_width = min(pct, 100)
-            bar_color = (f"linear-gradient(90deg,{DANGER},#ff9090)"
-                         if over else
-                         f"linear-gradient(90deg,{SUCCESS},#8ed8bb)")
-            st.markdown(f"""
-            <div class="budget-row">
-                <div class="budget-cat">{cat.replace("_"," ").title()}</div>
-                <div class="budget-bar-wrap">
-                    <div class="budget-bar" style="width:{bar_width:.1f}%;background:{bar_color};"></div>
-                </div>
-                <div class="budget-amounts">
-                    ${act:,.0f} / ${sug:,.0f} {"⚠️" if over else "✅"}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_chart:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown(section_header("Side-by-Side Comparison", "📈"), unsafe_allow_html=True)
-        if PLOTLY_AVAILABLE:
-            cats_s = sorted(cat_cols, key=lambda c: actual_30[c], reverse=True)
-            fig_b = go.Figure(data=[
-                go.Bar(name="Suggested", x=cats_s, y=[suggested[c] for c in cats_s],
-                       marker_color=CANDY_BLUE, opacity=0.75,
-                       hovertemplate="%{x}<br>Suggested: $%{y:,.0f}<extra></extra>"),
-                go.Bar(name="Actual 30d", x=cats_s, y=[actual_30[c] for c in cats_s],
-                       marker_color=ORCHID,
-                       hovertemplate="%{x}<br>Actual: $%{y:,.0f}<extra></extra>"),
-            ])
-            fig_b.update_layout(
-                barmode="group", height=300,
-                margin=dict(l=10, r=10, t=10, b=65),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                            font=dict(size=11, family="Inter"), bgcolor="rgba(0,0,0,0)"),
-                xaxis=dict(showgrid=False, tickangle=-35,
-                           tickfont=dict(family="Inter", size=10, color=SLATE)),
-                yaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
-                           tickprefix="$", tickformat=",.0f",
-                           tickfont=dict(family="Inter", size=11, color=SLATE), zeroline=False),
-                bargap=0.22, bargroupgap=0.06,
+    # ── Budget sliders ──────────────────────────────────────────────────────────
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown(section_header("Set Monthly Budget Targets", "🎛️"), unsafe_allow_html=True)
+    st.markdown(
+        f'<p style="font-size:0.82rem;color:{SLATE};margin-bottom:1rem;">'
+        'Drag sliders to set your monthly target per category. '
+        'Spend is normalised to a 30-day equivalent from your tracking period.</p>',
+        unsafe_allow_html=True,
+    )
+    budgets = {}
+    ncols = min(3, len(cat_cols)) if cat_cols else 1
+    slider_cols = st.columns(ncols)
+    for i, cat in enumerate(cat_cols):
+        icon = cat_icons.get(cat, "📌")
+        with slider_cols[i % ncols]:
+            budgets[cat] = st.slider(
+                f"{icon} {cat}",
+                0, 10000, default_targets.get(cat, 1500), 50,
+                key=f"budget_{cat}",
             )
-            st.plotly_chart(fig_b, use_container_width=True, config={"displayModeBar": False})
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    over_budget = [(c, actual_monthly[c], budgets[c]) for c in cat_cols if actual_monthly.get(c, 0) > budgets[c]]
+
+    # ── Over-budget alerts ──────────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+    if over_budget:
+        with st.container(border=True):
+            st.markdown(section_header(f"Over-Budget Categories ({len(over_budget)})", "⚠️"), unsafe_allow_html=True)
+            for cat, actual, target in over_budget:
+                icon = cat_icons.get(cat, "📌")
+                overage = actual - target
+                pct = int((actual / target) * 100) if target > 0 else 0
+                st.markdown(f"""
+                <div style="display:flex;align-items:center;gap:12px;padding:0.6rem 0;border-bottom:1px solid rgba(224,112,112,0.12);">
+                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(224,112,112,0.15);display:flex;align-items:center;justify-content:center;">{icon}</div>
+                    <div style="flex:1;">
+                        <div style="font-weight:600;color:{ONYX};">{cat}</div>
+                        <div style="font-size:0.72rem;color:{SLATE};">Monthly avg: {fmt_curr(actual)} &nbsp;&middot;&nbsp; Budget: {fmt_curr(target)}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700;color:{DANGER};">+{fmt_curr(overage)} over</div>
+                        <div style="font-size:0.72rem;color:{DANGER};">{pct}% of budget used</div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="glass-card" style="border-color:rgba(91,184,150,0.4);background:rgba(91,184,150,0.04);text-align:center;padding:1.4rem;">
+            <div style="font-size:1.8rem;margin-bottom:0.3rem;">✅</div>
+            <div style="font-weight:600;color:{SUCCESS};font-size:1rem;">All categories within budget!</div>
+            <div style="font-size:0.8rem;color:{SLATE};margin-top:0.25rem;">Great financial discipline.</div>
+        </div>""", unsafe_allow_html=True)
+
+    # ── Donut + progress bars ───────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+    col_donut, col_progress = st.columns([1, 1.2], gap="large")
+
+    with col_donut:
+        with st.container(border=True):
+            st.markdown(section_header("Monthly Spend Allocation", "🍩"), unsafe_allow_html=True)
+            if PLOTLY_AVAILABLE:
+                palette = [CANDY_BLUE, ORCHID, SUCCESS, WARNING_CLR, DANGER, DEEP_BLUE]
+                donut_vals  = [actual_monthly[c] for c in cat_cols]
+                total_spend = sum(donut_vals)
+                fig_donut = go.Figure(go.Pie(
+                    labels=cat_cols, values=donut_vals, hole=0.58,
+                    marker=dict(colors=palette[:len(cat_cols)]),
+                    textfont=dict(family="Inter", size=11),
+                    hovertemplate=f"<b>%{{label}}</b><br>{sym}%{{value:,.0f}}/mo<br>%{{percent}}<extra></extra>",
+                ))
+                fig_donut.update_layout(
+                    height=270, margin=dict(l=10, r=10, t=10, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)", showlegend=True,
+                    legend=dict(font=dict(size=11, family="Inter"), orientation="v"),
+                    annotations=[dict(
+                        text=f"<b>{fmt_curr(total_spend)}</b><br>/mo",
+                        x=0.5, y=0.5, showarrow=False, font=dict(size=13, family="Inter", color=ONYX),
+                    )],
+                )
+                st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
+
+    with col_progress:
+        with st.container(border=True):
+            st.markdown(section_header("Budget vs. Actual (monthly avg)", "📊"), unsafe_allow_html=True)
+            for cat in cat_cols:
+                actual = actual_monthly.get(cat, 0)
+                target = budgets[cat]
+                pct    = min(100, int((actual / target) * 100)) if target > 0 else 0
+                icon   = cat_icons.get(cat, "📌")
+                over   = actual > target
+                bar_color = DANGER if over else SUCCESS
+                status    = f"+{fmt_curr(actual - target)} over" if over else f"{fmt_curr(target - actual)} remaining"
+                st.markdown(f"""
+                <div style="margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                        <span style="font-weight:500;font-size:0.85rem;">{icon} {cat}</span>
+                        <span style="font-size:0.74rem;color:{DANGER if over else SUCCESS};font-weight:600;">{status}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:{SLATE};margin-bottom:4px;">
+                        <span>Spent: {fmt_curr(actual)}/mo</span><span>Budget: {fmt_curr(target)}/mo</span>
+                    </div>
+                    <div style="background:rgba(178,213,229,0.2);border-radius:6px;height:8px;overflow:hidden;">
+                        <div style="width:{pct}%;background:{bar_color};height:100%;border-radius:6px;"></div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VIEW: SETTINGS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def render_view_settings():
-    st.markdown(section_header("Settings", "⚙️"), unsafe_allow_html=True)
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:10px;padding:0.8rem 1rem;
-                background:rgba(240,160,75,0.08);border:1px solid rgba(240,160,75,0.28);
-                border-radius:10px;font-size:0.82rem;color:#c07830;margin-bottom:1.8rem;">
-        ⚠️ <span>Settings are <b>read-only in this demo</b>. Values shown are the defaults used by the dashboard.</span>
-    </div>
-    """, unsafe_allow_html=True)
+def render_view_settings(summary_df):
+    curr_sym_idx = ["$", "€", "£", "₹"].index(st.session_state.get("currency_symbol", "$")) if st.session_state.get("currency_symbol", "$") in ["$", "€", "£", "₹"] else 0
+    curr_buffer  = int(st.session_state.get("safety_buffer", 1000.0))
 
     col_s1, col_s2 = st.columns([1, 1], gap="large")
 
     with col_s1:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown('<div class="settings-section-title">📊 Display Preferences</div>', unsafe_allow_html=True)
-        st.text_input("Currency Symbol", value="$", disabled=True,
-                      help="Symbol prepended to all monetary values.")
-        st.selectbox("Date Format",
-                     ["MMM DD, YYYY", "DD/MM/YYYY", "YYYY-MM-DD"], disabled=True)
-        st.selectbox("Fiscal Year Start",
-                     ["January", "April", "July", "October"], disabled=True)
-        st.toggle("Dark Mode", value=False, disabled=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="settings-section-title">📊 Display Preferences</div>', unsafe_allow_html=True)
+            new_curr = st.selectbox(
+                "Currency Symbol", ["$", "€", "£", "₹"],
+                index=curr_sym_idx,
+                help="Symbol prepended to all monetary values across the dashboard.",
+                key="settings_curr_sym"
+            )
+            st.selectbox("Date Format", ["MMM DD, YYYY", "DD/MM/YYYY", "YYYY-MM-DD"], disabled=True)
+            st.selectbox("Fiscal Year Start", ["January", "April", "July", "October"], disabled=True)
+            st.toggle("Dark Mode", value=False, disabled=True)
 
     with col_s2:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown('<div class="settings-section-title">🛡️ Risk & Alerts</div>', unsafe_allow_html=True)
-        st.number_input("Safety Buffer ($)", value=2000, min_value=0,
-                        max_value=50000, step=500, disabled=True,
-                        help="Minimum balance threshold on the forecast chart.")
-        st.slider("Anomaly Sensitivity", min_value=0, max_value=100, value=70,
-                  disabled=True, help="Threshold for flagging transactions as anomalous.")
-        st.selectbox("Alert Method", ["Dashboard Only", "Email", "Slack"], disabled=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="settings-section-title">🛡️ Risk & Alerts</div>', unsafe_allow_html=True)
+            new_buffer = st.number_input(
+                f"Safety Buffer ({new_curr})",
+                value=curr_buffer, min_value=0, max_value=50000, step=500,
+                help="Minimum balance threshold used to compute risk scores and forecast alerts.",
+                key="settings_safety_buffer"
+            )
+            st.slider("Anomaly Sensitivity", min_value=0, max_value=100, value=70, disabled=True)
+            st.selectbox("Alert Method", ["Dashboard Only", "Email", "Slack"], disabled=True)
 
     st.markdown("<div style='margin-top:1.2rem;'></div>", unsafe_allow_html=True)
     col_s3, col_s4 = st.columns([1, 1], gap="large")
 
     with col_s3:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown('<div class="settings-section-title">🔄 Data Pipeline</div>', unsafe_allow_html=True)
-        st.text_input("Data Directory", value="./data/", disabled=True,
-                      help="Directory where CSV/JSON data files are read from.")
-        st.number_input("Cache TTL (seconds)", value=60, disabled=True,
-                        help="How frequently the dashboard re-reads data from disk.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="settings-section-title">🔄 Data Pipeline</div>', unsafe_allow_html=True)
+            st.text_input("Data Directory", value="./data/", disabled=True)
+            st.number_input("Cache TTL (seconds)", value=60, disabled=True)
 
     with col_s4:
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown('<div class="settings-section-title">📑 About</div>', unsafe_allow_html=True)
-        for lbl, val in [
-            ("App",       "CashFlow Radar"),
-            ("Version",   "1.0.0"),
-            ("Built for", "GenAI APAC Hackathon"),
-            ("Engine",    "RAPIDS cuDF + cuML"),
-            ("UI",        "Streamlit + Plotly"),
-        ]:
-            st.markdown(
-                f'<div style="display:flex;justify-content:space-between;padding:0.4rem 0;'
-                f'border-bottom:1px solid rgba(178,213,229,0.15);font-size:0.83rem;">'
-                f'<span style="color:{SLATE};">{lbl}</span>'
-                f'<span style="font-weight:600;color:{ONYX};">{val}</span></div>',
-                unsafe_allow_html=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="settings-section-title">📑 About</div>', unsafe_allow_html=True)
+            for lbl, val in [
+                ("App",       "CashFlow Radar"),
+                ("Version",   "1.0.0"),
+                ("Built for", "GenAI APAC Hackathon"),
+                ("Engine",    "RAPIDS cuDF + cuML"),
+                ("UI",        "Streamlit + Plotly"),
+            ]:
+                st.markdown(
+                    f'<div style="display:flex;justify-content:space-between;padding:0.4rem 0;'
+                    f'border-bottom:1px solid rgba(178,213,229,0.15);font-size:0.83rem;">'
+                    f'<span style="color:{SLATE};">{lbl}</span>'
+                    f'<span style="font-weight:600;color:{ONYX};">{val}</span></div>',
+                    unsafe_allow_html=True
+                )
 
     st.markdown("<div style='margin-top:1.6rem;'></div>", unsafe_allow_html=True)
-    col_btn, _ = st.columns([0.28, 0.72])
-    with col_btn:
+    bcol1, bcol2, _ = st.columns([0.25, 0.28, 0.47])
+    with bcol1:
         if st.button("💾  Save Settings", use_container_width=True, type="primary"):
-            st.info("Settings are read-only in this demo — no changes were saved.", icon="ℹ️")
+            st.session_state["currency_symbol"] = new_curr
+            st.session_state["safety_buffer"]   = float(new_buffer)
+            st.toast("✅ Settings saved successfully! Currency & Risk Score updated.", icon="✅")
+            st.rerun()
+
+    with bcol2:
+        if st.button("🔄  Reset to Defaults", use_container_width=True):
+            st.session_state["currency_symbol"] = "$"
+            st.session_state["safety_buffer"]   = 1000.0
+            st.toast("🔄 Settings reset to defaults ($ / $1,000 buffer).", icon="🔄")
+            st.rerun()
+
+    # ── Add Transaction Manually ─────────────────────────────────────────────
+    st.markdown("<div style='margin-top:2rem;'></div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown('<div class="settings-section-title">➕ Add Transaction Manually</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:0.78rem;color:#8FA8B8;margin-bottom:0.9rem;padding:0.5rem 0.8rem;'
+            'background:rgba(240,160,75,0.10);border:1px solid rgba(240,160,75,0.30);border-radius:8px;">'
+            '⚠️ <b>Session-only</b> — added transactions are held in memory and reset on page refresh, '
+            'consistent with other session settings. They will NOT be written to disk.</div>',
+            unsafe_allow_html=True
+        )
+
+        # Derive categories from loaded data (mirrors Simulator logic — no duplication)
+        _meta_cols = {"date", "total_spend", "running_balance", "rolling_7d_spend", "rolling_30d_spend"}
+        if summary_df is not None and not summary_df.empty:
+            _cat_cols = [
+                c for c in summary_df.columns
+                if c not in _meta_cols
+                and pd.api.types.is_numeric_dtype(summary_df[c])
+                and summary_df[c].sum() > 0
+            ]
+        else:
+            _cat_cols = []
+        _all_cats = _cat_cols if _cat_cols else ["Food", "Software", "Hardware", "Rent", "Travel", "Utilities", "Entertainment", "Misc"]
+
+        import datetime
+        tf_col1, tf_col2 = st.columns([1, 1], gap="medium")
+        with tf_col1:
+            txn_date = st.date_input(
+                "Date", value=datetime.date.today(),
+                key="manual_txn_date",
+                help="Date of the transaction"
+            )
+            txn_merchant = st.text_input(
+                "Merchant / Description",
+                placeholder="e.g. Amazon, Starbucks",
+                key="manual_txn_merchant"
+            )
+        with tf_col2:
+            txn_category = st.selectbox(
+                "Category", _all_cats,
+                key="manual_txn_category",
+                help="Category column the spend will be added to"
+            )
+            txn_amount = st.number_input(
+                f"Amount ({get_currency_symbol()})",
+                min_value=0.01, value=50.0, step=1.0,
+                key="manual_txn_amount",
+                help="Positive value = expense / spend"
+            )
+
+        if st.button("➕ Add Transaction", type="primary", key="manual_txn_submit"):
+            if not txn_merchant.strip():
+                st.warning("Please enter a merchant name.")
+            else:
+                if "manual_txns" not in st.session_state:
+                    st.session_state["manual_txns"] = []
+                st.session_state["manual_txns"].append({
+                    "date":     str(txn_date),
+                    "merchant": txn_merchant.strip(),
+                    "category": txn_category,
+                    "amount":   float(txn_amount),
+                })
+                st.toast(f"✅ {txn_merchant.strip()} ({get_currency_symbol()}{txn_amount:,.2f}) added to session.", icon="✅")
+                st.rerun()
+
+        # Show session transactions table if any exist
+        _manual_txns = st.session_state.get("manual_txns", [])
+        if _manual_txns:
+            st.markdown(
+                f'<div style="font-size:0.76rem;color:#6FA8C0;font-weight:600;margin-top:0.8rem;">'
+                f'📋 {len(_manual_txns)} session transaction(s) added this session:</div>',
+                unsafe_allow_html=True
+            )
+            _txn_df = pd.DataFrame(_manual_txns)[["date", "merchant", "category", "amount"]]
+            _txn_df.columns = ["Date", "Merchant", "Category", f"Amount ({get_currency_symbol()})"]
+            st.dataframe(_txn_df, use_container_width=True, hide_index=True)
+            if st.button("🗑️  Clear Session Transactions", key="manual_txn_clear"):
+                st.session_state["manual_txns"] = []
+                st.toast("🗑️ Session transactions cleared.", icon="🗑️")
+                st.rerun()
+
+    # ── Upload Transaction CSV ───────────────────────────────────────────────
+    st.markdown("<div style='margin-top:2rem;'></div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown('<div class="settings-section-title">📂 Upload Transaction CSV</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size:0.78rem;color:#8FA8B8;margin-bottom:0.9rem;padding:0.5rem 0.8rem;'
+            'background:rgba(240,160,75,0.10);border:1px solid rgba(240,160,75,0.30);border-radius:8px;">'
+            '⚠️ <b>Session-only</b> — uploaded transactions are held in memory and reset on page refresh, '
+            'consistent with manual entry. They will NOT be written to disk.</div>',
+            unsafe_allow_html=True
+        )
+
+        # Schema hint for users
+        st.markdown(
+            '<div style="font-size:0.76rem;color:#8FA8B8;margin-bottom:0.8rem;">'
+            '📋 <b>Required columns:</b> '
+            '<code>date</code>, <code>merchant</code>, <code>category</code>, '
+            '<code>amount</code>, <code>account_balance_after</code>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+
+        _REQUIRED_COLS = {"date", "merchant", "category", "amount", "account_balance_after"}
+
+        uploaded_file = st.file_uploader(
+            "Choose a CSV file",
+            type=["csv"],
+            key="csv_upload",
+            help="CSV must contain columns: date, merchant, category, amount, account_balance_after",
+            label_visibility="collapsed",
+        )
+
+        if uploaded_file is not None:
+            try:
+                _upload_df = pd.read_csv(uploaded_file)
+
+                # ── Column validation ────────────────────────────────────────
+                _missing = _REQUIRED_COLS - set(_upload_df.columns.str.strip().str.lower())
+                if _missing:
+                    st.error(
+                        f"❌ **Schema mismatch** — the uploaded CSV is missing "
+                        f"{'column' if len(_missing) == 1 else 'columns'}: "
+                        f"`{'`, `'.join(sorted(_missing))}`\n\n"
+                        f"Please check your file and ensure all required columns are present."
+                    )
+                else:
+                    # Normalise column names to lowercase-stripped
+                    _upload_df.columns = _upload_df.columns.str.strip().str.lower()
+
+                    # Preview the data before importing
+                    st.markdown(
+                        f'<div style="font-size:0.76rem;color:#6FA8C0;font-weight:600;margin-bottom:0.4rem;">'
+                        f'👁️ Preview — {len(_upload_df)} row(s) detected:</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.dataframe(
+                        _upload_df[["date", "merchant", "category", "amount", "account_balance_after"]].head(10),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                    if len(_upload_df) > 10:
+                        st.caption(f"Showing first 10 of {len(_upload_df)} rows.")
+
+                    # ── Import button ────────────────────────────────────────
+                    if st.button("📥 Import into Session", type="primary", key="csv_import_btn"):
+                        if "manual_txns" not in st.session_state:
+                            st.session_state["manual_txns"] = []
+
+                        _imported = 0
+                        _skipped  = 0
+                        for _, _row in _upload_df.iterrows():
+                            try:
+                                # Reuse the exact same dict schema as manual entry
+                                st.session_state["manual_txns"].append({
+                                    "date":     str(_row["date"]).strip(),
+                                    "merchant": str(_row["merchant"]).strip(),
+                                    "category": str(_row["category"]).strip(),
+                                    "amount":   float(_row["amount"]),
+                                })
+                                _imported += 1
+                            except (ValueError, KeyError):
+                                _skipped += 1
+
+                        _msg = f"✅ {_imported} transaction(s) imported into session."
+                        if _skipped:
+                            _msg += f" ({_skipped} row(s) skipped due to invalid values.)"
+                        st.toast(_msg, icon="✅")
+                        st.rerun()
+
+            except Exception as _e:
+                st.error(
+                    f"❌ **Could not read the file**: {_e}\n\n"
+                    "Please ensure it is a valid UTF-8 encoded CSV file."
+                )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROTOTYPE: SCENARIO SIMULATOR  (NEW)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_view_simulator(summary_df, forecast_df):
+    col_sliders, col_chart = st.columns([1, 1.8], gap="large")
+    sym = get_currency_symbol()
+
+    with col_sliders:
+        with st.container(border=True):
+            st.markdown(section_header("Adjust Assumptions", "🎛️"), unsafe_allow_html=True)
+
+            income_delta = st.slider(
+                f"💰 Monthly Income Change ({sym})",
+                -5000, 5000, 0, 100,
+                help="Positive = income boost, Negative = income cut",
+                key="sim_income",
+            )
+
+            if summary_df is not None:
+                meta = {"date", "total_spend", "running_balance", "rolling_7d_spend", "rolling_30d_spend"}
+                cat_cols = [c for c in summary_df.columns
+                            if c not in meta
+                            and pd.api.types.is_numeric_dtype(summary_df[c])
+                            and summary_df[c].sum() > 0]
+            else:
+                cat_cols = ["Food", "Software", "Rent", "Hardware", "Misc"]
+
+            cat_icons = {"Food": "🍔", "Software": "💻", "Hardware": "🖥️", "Rent": "🏠", "Misc": "📦"}
+            st.markdown("<div style='margin-top:0.6rem;'></div>", unsafe_allow_html=True)
+            cat_deltas = {}
+            for cat in cat_cols:
+                icon = cat_icons.get(cat, "📌")
+                cat_deltas[cat] = st.slider(
+                    f"{icon} {cat} Change ({sym}/mo)",
+                    -3000, 3000, 0, 50,
+                    key=f"sim_{cat}",
+                )
+
+            total_monthly_delta = income_delta - sum(cat_deltas.values())
+            daily_delta = total_monthly_delta / 30.0
+
+        st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+        impact_color = SUCCESS if total_monthly_delta >= 0 else DANGER
+        impact_icon  = "📈" if total_monthly_delta >= 0 else "📉"
+        impact_label = "Monthly Surplus" if total_monthly_delta >= 0 else "Monthly Deficit"
+        with st.container(border=True):
+            st.markdown(f"""
+            <div style="text-align:center;">
+                <div style="font-size:0.72rem;font-weight:600;color:{SLATE};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Net Impact vs. Baseline</div>
+                <div style="font-size:2.4rem;font-weight:700;color:{impact_color};letter-spacing:-0.03em;">{impact_icon} {fmt_curr(abs(total_monthly_delta))}</div>
+                <div style="font-size:0.78rem;color:{SLATE};margin-top:0.25rem;">{impact_label}</div>
+                <div style="font-size:0.70rem;color:{SLATE};margin-top:0.3rem;">&asymp; {fmt_curr(abs(daily_delta), 2)} / day</div>
+            </div>""", unsafe_allow_html=True)
+
+    with col_chart:
+        with st.container(border=True):
+            st.markdown(section_header("30-Day Forecast: Baseline vs. Scenario", "🔮"), unsafe_allow_html=True)
+
+            if forecast_df is not None and not forecast_df.empty:
+                fc = forecast_df.copy()
+                fc["date"] = pd.to_datetime(fc["date"])
+                fc = fc.sort_values("date").reset_index(drop=True)
+                fc["scenario_balance"] = fc["projected_balance"] + [i * daily_delta for i in range(len(fc))]
+
+                if PLOTLY_AVAILABLE:
+                    fig = go.Figure()
+                    if "upper_bound" in fc.columns and "lower_bound" in fc.columns:
+                        fig.add_trace(go.Scatter(
+                            x=pd.concat([fc["date"], fc["date"][::-1]]),
+                            y=pd.concat([fc["upper_bound"], fc["lower_bound"][::-1]]),
+                            fill="toself", fillcolor="rgba(178,213,229,0.15)",
+                            line=dict(color="rgba(0,0,0,0)"),
+                            name="Baseline Confidence",
+                        ))
+                    fig.add_trace(go.Scatter(
+                        x=fc["date"], y=fc["projected_balance"],
+                        mode="lines",
+                        line=dict(color=CANDY_BLUE, width=2, dash="dot"),
+                        name="Baseline",
+                        hovertemplate=f"<b>Baseline</b><br>%{{x|%b %d}}: {sym}%{{y:,.0f}}<extra></extra>",
+                    ))
+                    sc_color = SUCCESS if total_monthly_delta >= 0 else DANGER
+                    fig.add_trace(go.Scatter(
+                        x=fc["date"], y=fc["scenario_balance"],
+                        mode="lines+markers",
+                        line=dict(color=sc_color, width=2.5),
+                        marker=dict(size=5, color=sc_color),
+                        name="Your Scenario",
+                        hovertemplate=f"<b>Scenario</b><br>%{{x|%b %d}}: {sym}%{{y:,.0f}}<extra></extra>",
+                    ))
+                    fig.update_layout(
+                        height=340, margin=dict(l=0, r=0, t=10, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(178,213,229,0.04)",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                                    font=dict(size=11, family="Inter"), bgcolor="rgba(0,0,0,0)"),
+                        hovermode="x unified",
+                        xaxis=dict(showgrid=False, tickfont=dict(family="Inter", size=11, color=SLATE)),
+                        yaxis=dict(showgrid=True, gridcolor="rgba(178,213,229,0.20)",
+                                   tickprefix=sym, tickformat=",.0f",
+                                   tickfont=dict(family="Inter", size=11, color=SLATE), zeroline=False),
+                    )
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+                baseline_end = fc["projected_balance"].iloc[-1]
+                scenario_end = fc["scenario_balance"].iloc[-1]
+                diff = scenario_end - baseline_end
+                k1, k2, k3 = st.columns(3)
+                with k1:
+                    st.markdown(kpi_html("Baseline End", fmt_curr(baseline_end), "30-day projection", "flat",
+                                         "📍", "rgba(178,213,229,0.25)"), unsafe_allow_html=True)
+                with k2:
+                    dir2 = "up" if scenario_end >= baseline_end else "down"
+                    st.markdown(kpi_html("Scenario End", fmt_curr(scenario_end), "Under your assumptions", dir2,
+                                         "🎯", "rgba(91,184,150,0.25)"), unsafe_allow_html=True)
+                with k3:
+                    dir3 = "up" if diff >= 0 else "down"
+                    st.markdown(kpi_html("30-Day Δ", fmt_curr(diff), "vs. baseline", dir3,
+                                         "📊", "rgba(229,189,223,0.25)"), unsafe_allow_html=True)
+            else:
+                st.markdown(no_data("🔮", "No Forecast Data", "Drop `forecast.csv` into `./data/`"), unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROTOTYPE: REPORT GENERATOR  (NEW)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_view_reports(summary_df, risk_data, forecast_df, anomalies_df):
+    # ── Download row ───────────────────────────────────────────────────
+    with st.container(border=True):
+        st.markdown(section_header("Export & Download", "📤"), unsafe_allow_html=True)
+        dl1, dl2, dl3 = st.columns(3)
+        with dl1:
+            if summary_df is not None:
+                st.download_button(
+                    "📊 Daily Summary CSV",
+                    summary_df.to_csv(index=False).encode("utf-8"),
+                    "cashflow_daily_summary.csv", "text/csv",
+                    use_container_width=True, key="dl_summary",
+                )
+        with dl2:
+            if anomalies_df is not None:
+                st.download_button(
+                    "⚠️ Anomalies CSV",
+                    anomalies_df.to_csv(index=False).encode("utf-8"),
+                    "cashflow_anomalies.csv", "text/csv",
+                    use_container_width=True, key="dl_anomalies",
+                )
+        with dl3:
+            frames = []
+            if summary_df is not None:
+                s = summary_df.copy(); s["_source"] = "daily_summary"; frames.append(s)
+            if anomalies_df is not None:
+                a = anomalies_df.copy(); a["_source"] = "anomaly"; frames.append(a)
+            if frames:
+                merged = pd.concat(frames, ignore_index=True)
+                st.download_button(
+                    "📦 Full Dataset CSV",
+                    merged.to_csv(index=False).encode("utf-8"),
+                    "cashflow_full_export.csv", "text/csv",
+                    use_container_width=True, key="dl_full",
+                )
+
+    # ── Snapshot + Risk ─────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+    col_left, col_right = st.columns([1.5, 1], gap="large")
+
+    with col_left:
+        with st.container(border=True):
+            st.markdown(section_header("Financial Snapshot", "📋"), unsafe_allow_html=True)
+            if summary_df is not None and not summary_df.empty:
+                last_bal  = summary_df["running_balance"].iloc[-1] if "running_balance" in summary_df.columns else 0
+                last_date = pd.to_datetime(summary_df["date"].iloc[-1]).strftime("%B %d, %Y")
+                total_sp  = summary_df["total_spend"].sum()  if "total_spend" in summary_df.columns else 0
+                avg_daily = summary_df["total_spend"].mean() if "total_spend" in summary_df.columns else 0
+                days      = len(summary_df)
+                anom_cnt  = len(anomalies_df) if anomalies_df is not None else 0
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown(kpi_html("Current Balance", f"${last_bal:,.2f}", f"As of {last_date}",
+                                         "up" if last_bal >= 0 else "down", "💰", "rgba(91,184,150,0.18)"),
+                                unsafe_allow_html=True)
+                    st.markdown("<div style='margin-top:0.5rem;'></div>", unsafe_allow_html=True)
+                    st.markdown(kpi_html("Total Spend", f"${total_sp:,.0f}", f"{days} days tracked",
+                                         "flat", "📊", "rgba(178,213,229,0.25)"), unsafe_allow_html=True)
+                with c2:
+                    st.markdown(kpi_html("Avg Daily Spend", f"${avg_daily:,.0f}", "per day",
+                                         "flat", "📅", "rgba(229,189,223,0.25)"), unsafe_allow_html=True)
+                    st.markdown("<div style='margin-top:0.5rem;'></div>", unsafe_allow_html=True)
+                    st.markdown(kpi_html("Anomalies", str(anom_cnt), "Flagged transactions",
+                                         "down" if anom_cnt > 0 else "flat", "⚠️", "rgba(240,160,75,0.18)"),
+                                unsafe_allow_html=True)
+            else:
+                st.markdown(no_data("📊", "No Data", "No daily summary available."), unsafe_allow_html=True)
+
+        st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(section_header("30-Day Forecast Summary", "🔮"), unsafe_allow_html=True)
+            if forecast_df is not None and not forecast_df.empty:
+                fc_disp = forecast_df.copy()
+                fc_disp["date"] = pd.to_datetime(fc_disp["date"]).dt.strftime("%b %d, %Y")
+                fc_disp = fc_disp.rename(columns={
+                    "projected_balance": "Projected ($)",
+                    "lower_bound": "Lower ($)",
+                    "upper_bound": "Upper ($)",
+                    "date": "Date",
+                })
+                st.dataframe(fc_disp, use_container_width=True, hide_index=True)
+            else:
+                st.markdown(no_data("🔮", "No Forecast", "No forecast.csv found."), unsafe_allow_html=True)
+
+    with col_right:
+        with st.container(border=True):
+            st.markdown(section_header("Risk Assessment", "🎯"), unsafe_allow_html=True)
+            if risk_data and PLOTLY_AVAILABLE:
+                score = risk_data.get("score", 0)
+                expl  = risk_data.get("explanation", "")
+                badge_cls = "low" if score < 40 else ("medium" if score < 70 else "high")
+                badge_txt = "Low Risk" if score < 40 else ("Medium Risk" if score < 70 else "High Risk")
+                fig_g = go.Figure(go.Indicator(
+                    mode="gauge+number", value=score,
+                    gauge=dict(
+                        axis=dict(range=[0, 100], tickwidth=1, tickcolor="rgba(0,0,0,0.2)"),
+                        bar=dict(color=CANDY_BLUE, thickness=0.25),
+                        bgcolor="rgba(0,0,0,0)", borderwidth=0,
+                        steps=[
+                            dict(range=[0, 40],  color="rgba(91,184,150,0.12)"),
+                            dict(range=[40, 70], color="rgba(240,160,75,0.12)"),
+                            dict(range=[70, 100], color="rgba(224,112,112,0.12)"),
+                        ],
+                    ),
+                    number=dict(font=dict(size=38, color=ONYX, family="Inter")),
+                ))
+                fig_g.update_layout(
+                    height=180, margin=dict(l=20, r=20, t=10, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)", font=dict(family="Inter"),
+                )
+                st.plotly_chart(fig_g, use_container_width=True, config={"displayModeBar": False})
+                st.markdown(f'<div style="text-align:center;"><span class="risk-badge {badge_cls}">{badge_txt}</span></div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="font-size:0.75rem;color:{SLATE};text-align:center;margin-top:0.7rem;line-height:1.5;">{expl}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(no_data("🎯", "No Risk Score", "No risk_score.json found."), unsafe_allow_html=True)
+
+        st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(section_header("Flagged Anomalies", "⚠️"), unsafe_allow_html=True)
+            if anomalies_df is not None and not anomalies_df.empty:
+                st.dataframe(anomalies_df, use_container_width=True, hide_index=True)
+            else:
+                st.markdown(no_data("✅", "No Anomalies", "No flagged transactions found."), unsafe_allow_html=True)
+
+    # ── HTML Report Generator ────────────────────────────────────────────
+    st.markdown("<div style='margin-top:1rem;'></div>", unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown(section_header("HTML Report Generator", "📄"), unsafe_allow_html=True)
+        st.markdown('<p style="font-size:0.82rem;color:#8FA8B8;margin-bottom:1rem;">Generate a printable, standalone HTML report with all your financial data.</p>',
+                    unsafe_allow_html=True)
+        if st.button("⚡ Generate HTML Report", type="primary", key="gen_html_btn"):
+            bal       = summary_df["running_balance"].iloc[-1] if summary_df is not None and "running_balance" in summary_df.columns else 0
+            date_str  = pd.to_datetime(summary_df["date"].iloc[-1]).strftime("%B %d, %Y") if summary_df is not None else "N/A"
+            score_val = risk_data.get("score", "N/A") if risk_data else "N/A"
+            expl_val  = risk_data.get("explanation", "") if risk_data else ""
+            anom_cnt  = len(anomalies_df) if anomalies_df is not None else 0
+            anom_rows_html = ""
+            if anomalies_df is not None and not anomalies_df.empty:
+                for _, r in anomalies_df.iterrows():
+                    anom_rows_html += (
+                        f"<tr><td>{r.get('date','')}</td>"
+                        f"<td>{r.get('merchant','')}</td>"
+                        f"<td>{r.get('category','')}</td>"
+                        f"<td>${abs(r.get('amount', 0)):,.2f}</td>"
+                        f"<td>{r.get('severity','')}</td></tr>"
+                    )
+            gen_time = pd.Timestamp.now().strftime("%B %d, %Y %H:%M")
+            html_out = (
+                "<!DOCTYPE html>\n<html lang='en'>\n<head>\n"
+                "<meta charset='UTF-8'>\n<title>CashFlow Radar Report</title>\n"
+                "<style>\n"
+                "  body{font-family:'Segoe UI',sans-serif;background:#EAF3F9;color:#1D1D1D;margin:0;padding:2rem;}\n"
+                "  h1{font-size:2rem;font-weight:700;margin-bottom:0.2rem;}\n"
+                "  .sub{color:#8FA8B8;font-size:0.85rem;margin-bottom:2rem;}\n"
+                "  .card{background:rgba(255,255,255,0.92);border:1.5px solid rgba(178,213,229,0.5);border-radius:16px;padding:1.5rem;margin-bottom:1.5rem;}\n"
+                "  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1rem;}\n"
+                "  .kpi{background:rgba(178,213,229,0.12);border-radius:12px;padding:1rem;}\n"
+                "  .kpi-l{font-size:0.68rem;font-weight:600;color:#8FA8B8;text-transform:uppercase;letter-spacing:0.05em;}\n"
+                "  .kpi-v{font-size:1.4rem;font-weight:700;margin-top:0.25rem;}\n"
+                "  table{width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:0.75rem;}\n"
+                "  th{background:rgba(178,213,229,0.2);padding:0.55rem 1rem;text-align:left;font-size:0.72rem;font-weight:600;text-transform:uppercase;color:#8FA8B8;}\n"
+                "  td{padding:0.55rem 1rem;border-bottom:1px solid rgba(178,213,229,0.18);}\n"
+                "  .footer{text-align:center;font-size:0.72rem;color:#8FA8B8;margin-top:2rem;border-top:1px solid rgba(178,213,229,0.2);padding-top:1rem;}\n"
+                "</style>\n</head>\n<body>\n"
+                f"<h1>&#128225; CashFlow Radar &#8212; Financial Report</h1>\n"
+                f"<div class='sub'>Generated {gen_time} &nbsp;&middot;&nbsp; GenAI APAC Hackathon</div>\n"
+                "<div class='card'>\n"
+                "  <h2 style='font-size:1.1rem;margin:0 0 0.5rem;'>Financial Snapshot</h2>\n"
+                "  <div class='kpi-grid'>\n"
+                f"    <div class='kpi'><div class='kpi-l'>Balance</div><div class='kpi-v'>${bal:,.2f}</div><div style='font-size:0.72rem;color:#8FA8B8;'>{date_str}</div></div>\n"
+                f"    <div class='kpi'><div class='kpi-l'>Risk Score</div><div class='kpi-v'>{score_val}/100</div></div>\n"
+                f"    <div class='kpi'><div class='kpi-l'>Anomalies</div><div class='kpi-v'>{anom_cnt}</div></div>\n"
+                "  </div>\n"
+                f"  <p style='font-size:0.84rem;color:#8FA8B8;margin-top:1rem;'>{expl_val}</p>\n"
+                "</div>\n"
+                "<div class='card'>\n"
+                "  <h2 style='font-size:1.1rem;margin:0;'>Flagged Anomalies</h2>\n"
+                "  <table><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Severity</th></tr>\n"
+                + (anom_rows_html if anom_rows_html else "  <tr><td colspan='5' style='text-align:center;color:#8FA8B8;'>No anomalies detected</td></tr>\n")
+                + "  </table>\n</div>\n"
+                "<div class='footer'>&#128225; CashFlow Radar &nbsp;&middot;&nbsp; GenAI APAC Hackathon &nbsp;&middot;&nbsp; RAPIDS cuDF &amp; cuML</div>\n"
+                "</body>\n</html>"
+            )
+            st.download_button(
+                "📥 Download HTML Report",
+                html_out.encode("utf-8"),
+                "cashflow_radar_report.html",
+                "text/html",
+                key="dl_html_btn",
+            )
+            st.success("✅ HTML report ready! Click above to download.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1904,6 +2991,10 @@ def main():
                          "Monthly trends, category rankings, and spend highlights."),
         "Budgets":      ("Budgets",        "CashFlow Radar › Budgets",
                          "Auto-suggested monthly budgets based on your historical spend pattern."),
+        "Simulator":    ("Cash-Flow Scenario Simulator", "CashFlow Radar › Simulator",
+                         "Adjust income and spending assumptions to see how your 30-day projected balance changes."),
+        "Reports":      ("Financial Report",             "CashFlow Radar › Reports",
+                         "Export a full financial snapshot as CSV or a styled HTML report."),
         "Settings":     ("Settings",       "CashFlow Radar › Settings",
                          "Dashboard configuration (read-only in this demo)."),
     }
@@ -1918,12 +3009,56 @@ def main():
     <div style="font-size:0.82rem;color:#8FA8B8;margin-bottom:1.4rem;">{subtitle}</div>
     """, unsafe_allow_html=True)
 
+    # ── Merge any session-added transactions into summary_df before dispatch ──
+    # This ensures compute_dynamic_risk(), render_kpi_strip(), all charts, etc.
+    # automatically reflect new rows without duplicating any calculation logic.
+    manual_txns = st.session_state.get("manual_txns", [])
+    if manual_txns and summary_df is not None:
+        _extra_rows = []
+        for txn in manual_txns:
+            row = {c: 0.0 for c in summary_df.columns}
+            row["date"] = txn["date"]
+            if txn["category"] in summary_df.columns:
+                row[txn["category"]] = float(txn["amount"])
+            if "total_spend" in summary_df.columns:
+                row["total_spend"] = float(txn["amount"])
+            if "running_balance" in summary_df.columns:
+                last_bal = float(summary_df["running_balance"].dropna().iloc[-1])
+                row["running_balance"] = last_bal - float(txn["amount"])
+            _extra_rows.append(row)
+        if _extra_rows:
+            summary_df = pd.concat([summary_df, pd.DataFrame(_extra_rows)], ignore_index=True)
+
     # ── View dispatch ──
     if view == "Dashboard":
+
         render_kpi_strip(summary_df, risk_data)
+        st.markdown("<div style='margin-bottom:0.6rem;'></div>", unsafe_allow_html=True)
+
+        # 1. MONEY WEATHER — fastest-read card, top of dashboard
+        render_money_weather(risk_data, forecast_df)
         st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
+
         render_hero_and_risk(summary_df, risk_data, forecast_df)
         st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
+
+        # 2 & 3. CASH FLOW STORY + HIDDEN MONEY FINDER — side by side
+        col_story, col_money = st.columns([1.4, 1], gap="large")
+        with col_story:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            render_cash_flow_story(summary_df, risk_data, forecast_df)
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col_money:
+            st.markdown('<div class="glass-card" style="height:100%;">', unsafe_allow_html=True)
+            render_hidden_money_finder(anomalies_df)
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
+
+        # Existing: CashFlow Insight
+        render_insight_panel(summary_df, risk_data, forecast_df, anomalies_df)
+        st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
+
+        # Existing: Forecast chart + Anomaly alerts
         col_fc, col_anom = st.columns([1.6, 1], gap="large")
         with col_fc:
             st.markdown('<div class="glass-card">', unsafe_allow_html=True)
@@ -1934,6 +3069,8 @@ def main():
             render_anomaly_alerts(anomalies_df)
             st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
+
+        # Existing: Spend breakdown + Benchmark
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
         render_spend_breakdown(summary_df)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1953,8 +3090,14 @@ def main():
     elif view == "Budgets":
         render_view_budgets(summary_df)
 
+    elif view == "Simulator":
+        render_view_simulator(summary_df, forecast_df)
+
+    elif view == "Reports":
+        render_view_reports(summary_df, risk_data, forecast_df, anomalies_df)
+
     elif view == "Settings":
-        render_view_settings()
+        render_view_settings(summary_df)
 
     # ── Footer (shown on all views) ──
     st.markdown("""
@@ -1965,7 +3108,6 @@ def main():
         Powered by RAPIDS cuDF &amp; cuML &nbsp;·&nbsp; Dashboard by Streamlit
     </div>
     """, unsafe_allow_html=True)
-
 
 
 # ── Auto-launch if run directly (python app.py) ──

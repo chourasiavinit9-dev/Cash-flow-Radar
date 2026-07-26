@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .streamlit/secrets.toml
 .DS_Store
+TODAYS_PROGRESS_HANDOVER.md
+IMPLEMENTATION_PLAN.md

@@ -4,3 +4,4 @@ pandas>=2.0.0
 numpy>=1.24.0
 plotly>=5.20.0
 pyarrow>=14.0.0
+google-genai>=1.0.0
