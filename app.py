@@ -1322,9 +1322,10 @@ Provide a clear, direct answer in 2 to 3 sentences in plain language.
                     insight_answer = None
 
             # Debug expander — always visible so we can inspect every call
+            _key_loaded_display = "Yes" if api_key else "No"
             with st.expander("🔍 Debug info", expanded=False):
                 st.markdown(f"**Question received:** `{_new_q}`")
-                st.markdown(f"**SDK available:** `{GROQ_SDK_AVAILABLE}` &nbsp; | &nbsp; **Key loaded:** `{'Yes (' + api_key[:8] + '...)' if api_key else 'No'}`")
+                st.markdown(f"**SDK available:** `{GROQ_SDK_AVAILABLE}` &nbsp; | &nbsp; **Key loaded:** `{_key_loaded_display}`")
                 st.markdown(f"**Groq call attempted:** `{groq_attempted}`")
                 if groq_attempted and groq_error is None:
                     st.success(f"✅ Groq call succeeded")
@@ -1534,6 +1535,13 @@ def render_hero_and_risk(summary_df: pd.DataFrame | None, risk_data: dict | None
                 with st.container(border=True):
                     st.markdown(f'<div class="section-header"><span class="dot" style="background:#E5BDDF;"></span>Cash-Flow Risk Score</div>', unsafe_allow_html=True)
                     st.plotly_chart(fig_gauge, width="stretch", config={"displayModeBar": False})
+                    st.markdown(f'<div style="text-align:center;"><span class="risk-badge {badge_cls}">{badge_lbl}</span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-size:0.75rem;color:#8FA8B8;text-align:center;margin-top:0.7rem;line-height:1.5;">{expl[:160]}{"…" if len(expl) > 160 else ""}</div>', unsafe_allow_html=True)
+            else:
+                # Plotly not available — render plain-text risk card (no empty gap)
+                with st.container(border=True):
+                    st.markdown(f'<div class="section-header"><span class="dot" style="background:#E5BDDF;"></span>Cash-Flow Risk Score</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="text-align:center;font-size:2.8rem;font-weight:700;color:{score_color};margin:0.8rem 0;">{score:.0f}<span style="font-size:1rem;color:#8FA8B8;">/100</span></div>', unsafe_allow_html=True)
                     st.markdown(f'<div style="text-align:center;"><span class="risk-badge {badge_cls}">{badge_lbl}</span></div>', unsafe_allow_html=True)
                     st.markdown(f'<div style="font-size:0.75rem;color:#8FA8B8;text-align:center;margin-top:0.7rem;line-height:1.5;">{expl[:160]}{"…" if len(expl) > 160 else ""}</div>', unsafe_allow_html=True)
         else:
