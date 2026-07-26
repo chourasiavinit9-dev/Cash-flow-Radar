@@ -1257,12 +1257,19 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
 
         user_query = st.text_input(
             "Ask your AI Financial Advisor",
-            value="Can I afford a $500 laptop next month?",
             placeholder="e.g. Can I afford a $500 laptop next month? or What should I watch out for?",
             key="insight_user_input"
         )
+        ask_btn = st.button("💬 Ask Radar", type="primary", key="insight_ask_btn")
 
-        if user_query:
+        # Only run when user explicitly clicks Ask or presses Enter (query changed)
+        _last_q   = st.session_state.get("_insight_last_q", "")
+        _new_q    = (user_query or "").strip()
+        _triggered = ask_btn or (_new_q and _new_q != _last_q)
+
+        if _new_q and _triggered:
+            st.session_state["_insight_last_q"] = _new_q  # update after triggering
+
             api_key = None
             try:
                 if hasattr(st, "secrets") and st.secrets:
@@ -1275,10 +1282,13 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
             if not api_key:
                 api_key = os.environ.get("GROQ_API_KEY", "")
 
-            insight_answer = None  # always initialise before try block
+            insight_answer = None
             groq_error     = None
+            groq_attempted = False
+            raw_response   = None
 
             if GROQ_SDK_AVAILABLE and api_key and api_key.strip():
+                groq_attempted = True
                 try:
                     with st.spinner("🤖 Thinking with Groq LLaMA 3.3..."):
                         _client = Groq(api_key=api_key.strip())
@@ -1295,7 +1305,7 @@ Provide a clear, direct answer in 2 to 3 sentences in plain language.
 {anom_snippet}
 
 [USER QUESTION]
-"{user_query}"
+"{_new_q}"
 """
                         res = _client.chat.completions.create(
                             model="llama-3.3-70b-versatile",
@@ -1304,27 +1314,49 @@ Provide a clear, direct answer in 2 to 3 sentences in plain language.
                                 {"role": "user", "content": prompt},
                             ],
                         )
-                        insight_answer = res.choices[0].message.content.strip()
+                        raw_response   = res.choices[0].message.content
+                        insight_answer = raw_response.strip()
                 except Exception as e:
-                    groq_error = str(e)
-                    insight_answer = None  # will use fallback below
+                    # Use repr() so even empty-message exceptions produce a non-empty string
+                    groq_error = repr(e) if repr(e) else f"{type(e).__name__}: (no message)"
+                    insight_answer = None
 
-            # Use fallback if Groq wasn't called or failed
+            # Debug expander — always visible so we can inspect every call
+            with st.expander("🔍 Debug info", expanded=False):
+                st.markdown(f"**Question received:** `{_new_q}`")
+                st.markdown(f"**SDK available:** `{GROQ_SDK_AVAILABLE}` &nbsp; | &nbsp; **Key loaded:** `{'Yes (' + api_key[:8] + '...)' if api_key else 'No'}`")
+                st.markdown(f"**Groq call attempted:** `{groq_attempted}`")
+                if groq_attempted and groq_error is None:
+                    st.success(f"✅ Groq call succeeded")
+                    st.code(raw_response or "(empty response)", language="text")
+                elif groq_error:
+                    st.error(f"❌ Groq exception: {groq_error}")
+                else:
+                    st.warning("⚠️ Groq not attempted (no key or SDK missing) — using rule-based fallback")
+
+            # Fallback if Groq wasn't called or failed
             if insight_answer is None:
-                insight_answer = generate_insight_fallback(user_query, curr_bal, score, badge_lbl, expl, min_proj)
+                insight_answer = generate_insight_fallback(_new_q, curr_bal, score, badge_lbl, expl, min_proj)
 
-            # Show Groq error banner if the API call failed
+            # Error banner — guaranteed to show because groq_error is always non-empty on failure
             if groq_error:
-                st.warning(f"⚠️ Groq API error — showing rule-based answer instead. Error: `{groq_error[:200]}`")
+                st.warning(f"⚠️ Groq API error — showing rule-based answer instead. Error: `{groq_error[:300]}`")
 
+            # Cache answer in session_state so it persists across re-renders without re-calling API
+            st.session_state["_insight_answer"] = insight_answer
+            st.session_state["_insight_displayed_q"] = _new_q
+
+        # Display the cached answer (persists across reruns without re-firing API)
+        _cached_answer = st.session_state.get("_insight_answer")
+        _cached_q      = st.session_state.get("_insight_displayed_q", "")
+        if _cached_answer:
             st.markdown(f"""
             <div style="margin-top:0.8rem;padding:0.9rem 1.1rem;background:rgba(178,213,229,0.12);
                         border:1px solid rgba(178,213,229,0.35);border-radius:12px;font-size:0.86rem;
                         line-height:1.55;color:#1D1D1D;">
                 <div style="font-weight:600;color:#6FA8C0;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.3rem;">💡 CashFlow Insight Response</div>
-                {insight_answer}
+                {_cached_answer}
             </div>""", unsafe_allow_html=True)
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
