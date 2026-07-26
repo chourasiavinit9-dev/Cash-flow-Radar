@@ -2,7 +2,7 @@
 
 GPU-accelerated cash-flow intelligence dashboard for freelancers and small business owners — built for the GenAI APAC Edition Hackathon (Cohort 2).
 
-🔗 **Live demo:** [add your Streamlit Cloud URL here]
+🔗 **Live demo:** [https://cash-flow-radar-avg53pwdk4mxpmt6rev5tz.streamlit.app](https://cash-flow-radar-avg53pwdk4mxpmt6rev5tz.streamlit.app)
 💻 **GitHub:** https://github.com/chourasiavinit9-dev/Cash-flow-Radar
 
 ---
