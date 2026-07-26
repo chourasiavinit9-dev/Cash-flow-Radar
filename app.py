@@ -1260,9 +1260,26 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
     curr_bal = float(summary_df["running_balance"].dropna().iloc[-1]) if summary_df is not None and "running_balance" in summary_df.columns and not summary_df["running_balance"].dropna().empty else 0.0
     score, badge_cls, badge_lbl, score_color, expl = compute_dynamic_risk(risk_data, forecast_df)
     min_proj = float(forecast_df["projected_balance"].min()) if forecast_df is not None and "projected_balance" in forecast_df.columns and not forecast_df.empty else curr_bal
-    
-    fc_snippet = forecast_df[["date", "projected_balance"]].head(3).to_string(index=False) if forecast_df is not None and not forecast_df.empty else "N/A"
+    max_proj = float(forecast_df["projected_balance"].max()) if forecast_df is not None and "projected_balance" in forecast_df.columns and not forecast_df.empty else curr_bal
+
+    # Rich forecast snippet: first 7 days
+    fc_snippet = forecast_df[["date", "projected_balance"]].head(7).to_string(index=False) if forecast_df is not None and not forecast_df.empty else "N/A"
+
+    # Rich anomaly snippet
     anom_snippet = anomalies_df[["date", "merchant", "amount", "reason"]].head(4).to_string(index=False) if anomalies_df is not None and not anomalies_df.empty else "None"
+    anom_count = len(anomalies_df) if anomalies_df is not None else 0
+    anom_total = float(anomalies_df["amount"].abs().sum()) if anomalies_df is not None and "amount" in anomalies_df.columns else 0.0
+
+    # Category spend breakdown from summary_df
+    spend_cats = [c for c in ["Food", "Hardware", "Misc", "Rent", "Software", "Income"] if summary_df is not None and c in summary_df.columns]
+    cat_totals = {c: float(summary_df[c].abs().sum()) for c in spend_cats} if spend_cats else {}
+    cat_lines = "\n".join([f"  - {c}: {fmt_curr(v)}" for c, v in sorted(cat_totals.items(), key=lambda x: -x[1]) if v > 0])
+
+    # Income vs expenses
+    total_income = cat_totals.get("Income", 0.0)
+    total_spend  = float(summary_df["total_spend"].sum()) if summary_df is not None and "total_spend" in summary_df.columns else 0.0
+    net_flow     = total_income - total_spend
+
 
     with st.container(border=True):
         col_hdr, col_badge = st.columns([1, 0.4])
@@ -1310,16 +1327,30 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
                 try:
                     with st.spinner("🤖 Thinking with Groq LLaMA 3.3..."):
                         _client = Groq(api_key=api_key.strip())
-                        prompt = f"""You are CashFlow Insight, an AI financial advisor for CashFlow Radar.
-Answer the user's question grounded ONLY in the financial context provided below.
-Provide a clear, direct answer in 2 to 3 sentences in plain language.
+                        prompt = f"""You are CashFlow Insight, an expert AI financial advisor embedded in CashFlow Radar.
+Answer the user's question using ONLY the exact numbers provided in the financial context below.
+Be specific — cite actual dollar amounts and dates from the data. Never give vague or general advice.
+Reply in 2–4 clear sentences in plain language. Do not say "I don't have enough information".
 
 [FINANCIAL CONTEXT]
-- Current Portfolio Balance: {fmt_curr(curr_bal)}
-- Cash-Flow Risk Score: {score}/100 ({badge_lbl}) — {expl}
-- 30-Day Projected Balance (Next 3 Days):
+Current Portfolio Balance: {fmt_curr(curr_bal)}
+Cash-Flow Risk Score: {score}/100 ({badge_lbl}) — {expl}
+
+Income vs Expenses (tracked period):
+  - Total Income:   {fmt_curr(total_income)}
+  - Total Expenses: {fmt_curr(total_spend)}
+  - Net Cash Flow:  {fmt_curr(net_flow)} ({'surplus' if net_flow >= 0 else 'deficit'})
+
+Spending by Category:
+{cat_lines if cat_lines else "  No category breakdown available"}
+
+30-Day Balance Forecast:
+  - Minimum projected balance: {fmt_curr(min_proj)}
+  - Maximum projected balance: {fmt_curr(max_proj)}
+  - Next 7 days:
 {fc_snippet}
-- Recent Flagged Anomalies:
+
+Flagged Anomalies ({anom_count} total, {fmt_curr(anom_total)} in overcharges):
 {anom_snippet}
 
 [USER QUESTION]
@@ -1328,15 +1359,20 @@ Provide a clear, direct answer in 2 to 3 sentences in plain language.
                         res = _client.chat.completions.create(
                             model="llama-3.3-70b-versatile",
                             messages=[
-                                {"role": "system", "content": "You are a financial assistant. Answer ONLY using the provided data."},
+                                {"role": "system", "content": (
+                                    "You are a precise financial assistant. "
+                                    "Always reference the specific numbers given. "
+                                    "Never give generic advice. "
+                                    "If the user asks about an amount, compare it to their actual balance and forecast."
+                                )},
                                 {"role": "user", "content": prompt},
                             ],
                         )
                         insight_answer = res.choices[0].message.content.strip()
                 except Exception as e:
-                    # Use repr() so even empty-message exceptions produce a non-empty string
                     groq_error = repr(e) if repr(e) else f"{type(e).__name__}: (no message)"
                     insight_answer = None
+
 
 
 
