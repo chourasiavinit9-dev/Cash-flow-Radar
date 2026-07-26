@@ -1280,6 +1280,14 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
     total_spend  = float(summary_df["total_spend"].sum()) if summary_df is not None and "total_spend" in summary_df.columns else 0.0
     net_flow     = total_income - total_spend
 
+    # Rent-specific context
+    tracked_days   = len(summary_df) if summary_df is not None else 0
+    tracked_months = max(tracked_days // 30, 1)
+    avg_monthly_rent = cat_totals.get("Rent", 0.0) / tracked_months if tracked_months > 0 else 0.0
+    avg_monthly_income = total_income / tracked_months if tracked_months > 0 else 0.0
+    avg_monthly_spend  = total_spend / tracked_months if tracked_months > 0 else 0.0
+    avg_monthly_net    = avg_monthly_income - avg_monthly_spend
+
 
     with st.container(border=True):
         col_hdr, col_badge = st.columns([1, 0.4])
@@ -1306,7 +1314,7 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
         _triggered = _new_q and _new_q != _last_q
 
         if _triggered:
-            st.session_state["_insight_last_q"] = _new_q  # update after triggering
+            st.session_state["_insight_last_q"] = _new_q
 
             api_key = None
             try:
@@ -1328,15 +1336,26 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
                     with st.spinner("🤖 Thinking with Groq LLaMA 3.3..."):
                         _client = Groq(api_key=api_key.strip())
                         prompt = f"""You are CashFlow Insight, an expert AI financial advisor embedded in CashFlow Radar.
-Answer the user's question using ONLY the exact numbers provided in the financial context below.
-Be specific — cite actual dollar amounts and dates from the data. Never give vague or general advice.
-Reply in 2–4 clear sentences in plain language. Do not say "I don't have enough information".
+Answer the user's question using ONLY the exact numbers in the financial context below.
+Be specific — always cite actual dollar amounts. Never give vague or general advice.
+IMPORTANT: If the question is about increasing a recurring expense (rent, subscription, salary, etc.),
+evaluate it as a MONTHLY impact, NOT a one-time purchase. Use monthly income vs monthly spend.
+If the question is about a one-time purchase, compare it to the available balance and projected minimum.
+Reply in 2–4 clear sentences. Do not say "I don't have enough information".
 
 [FINANCIAL CONTEXT]
 Current Portfolio Balance: {fmt_curr(curr_bal)}
 Cash-Flow Risk Score: {score}/100 ({badge_lbl}) — {expl}
 
-Income vs Expenses (tracked period):
+Tracked Period: {tracked_days} days (~{tracked_months} months)
+
+Monthly Averages:
+  - Avg Monthly Income:   {fmt_curr(avg_monthly_income)}
+  - Avg Monthly Expenses: {fmt_curr(avg_monthly_spend)}
+  - Avg Monthly Net:      {fmt_curr(avg_monthly_net)} ({'surplus' if avg_monthly_net >= 0 else 'deficit — spending exceeds income'})
+  - Avg Monthly Rent:     {fmt_curr(avg_monthly_rent)}
+
+Total Period Income vs Expenses:
   - Total Income:   {fmt_curr(total_income)}
   - Total Expenses: {fmt_curr(total_spend)}
   - Net Cash Flow:  {fmt_curr(net_flow)} ({'surplus' if net_flow >= 0 else 'deficit'})
@@ -1361,9 +1380,11 @@ Flagged Anomalies ({anom_count} total, {fmt_curr(anom_total)} in overcharges):
                             messages=[
                                 {"role": "system", "content": (
                                     "You are a precise financial assistant. "
-                                    "Always reference the specific numbers given. "
-                                    "Never give generic advice. "
-                                    "If the user asks about an amount, compare it to their actual balance and forecast."
+                                    "Always cite the exact dollar figures provided. "
+                                    "CRITICAL: If the user asks about increasing a recurring expense (rent, salary, subscription), "
+                                    "calculate the monthly impact and compare it to their monthly net cash flow — "
+                                    "do NOT treat it as a one-time purchase. "
+                                    "If the monthly net is already negative, flag that clearly and be direct about the risk."
                                 )},
                                 {"role": "user", "content": prompt},
                             ],
@@ -1373,20 +1394,25 @@ Flagged Anomalies ({anom_count} total, {fmt_curr(anom_total)} in overcharges):
                     groq_error = repr(e) if repr(e) else f"{type(e).__name__}: (no message)"
                     insight_answer = None
 
-
-
-
             # Fallback if Groq wasn't called or failed
             if insight_answer is None:
                 insight_answer = generate_insight_fallback(_new_q, curr_bal, score, badge_lbl, expl, min_proj)
 
-            # Error banner — guaranteed to show because groq_error is always non-empty on failure
+            # Error banner
             if groq_error:
                 st.warning(f"⚠️ Groq API error — showing rule-based answer instead. Error: `{groq_error[:300]}`")
 
-            # Cache answer in session_state so it persists across re-renders without re-calling API
+            # Cache answer in session_state
             st.session_state["_insight_answer"] = insight_answer
             st.session_state["_insight_displayed_q"] = _new_q
+
+
+
+
+
+
+
+
 
         # Display the cached answer (persists across reruns without re-firing API)
         _cached_answer = st.session_state.get("_insight_answer")
