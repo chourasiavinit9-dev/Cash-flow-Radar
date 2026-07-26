@@ -1260,14 +1260,13 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
             placeholder="e.g. Can I afford a $500 laptop next month? or What should I watch out for?",
             key="insight_user_input"
         )
-        ask_btn = st.button("💬 Ask Radar", type="primary", key="insight_ask_btn")
 
-        # Only run when user explicitly clicks Ask or presses Enter (query changed)
-        _last_q   = st.session_state.get("_insight_last_q", "")
-        _new_q    = (user_query or "").strip()
-        _triggered = ask_btn or (_new_q and _new_q != _last_q)
+        # Trigger on Enter (query changed) — no button click required
+        _last_q    = st.session_state.get("_insight_last_q", "")
+        _new_q     = (user_query or "").strip()
+        _triggered = _new_q and _new_q != _last_q
 
-        if _new_q and _triggered:
+        if _triggered:
             st.session_state["_insight_last_q"] = _new_q  # update after triggering
 
             api_key = None
@@ -1284,11 +1283,8 @@ def render_insight_panel(summary_df: pd.DataFrame | None, risk_data: dict | None
 
             insight_answer = None
             groq_error     = None
-            groq_attempted = False
-            raw_response   = None
 
             if GROQ_SDK_AVAILABLE and api_key and api_key.strip():
-                groq_attempted = True
                 try:
                     with st.spinner("🤖 Thinking with Groq LLaMA 3.3..."):
                         _client = Groq(api_key=api_key.strip())
@@ -1314,26 +1310,13 @@ Provide a clear, direct answer in 2 to 3 sentences in plain language.
                                 {"role": "user", "content": prompt},
                             ],
                         )
-                        raw_response   = res.choices[0].message.content
-                        insight_answer = raw_response.strip()
+                        insight_answer = res.choices[0].message.content.strip()
                 except Exception as e:
                     # Use repr() so even empty-message exceptions produce a non-empty string
                     groq_error = repr(e) if repr(e) else f"{type(e).__name__}: (no message)"
                     insight_answer = None
 
-            # Debug expander — always visible so we can inspect every call
-            _key_loaded_display = "Yes" if api_key else "No"
-            with st.expander("🔍 Debug info", expanded=False):
-                st.markdown(f"**Question received:** `{_new_q}`")
-                st.markdown(f"**SDK available:** `{GROQ_SDK_AVAILABLE}` &nbsp; | &nbsp; **Key loaded:** `{_key_loaded_display}`")
-                st.markdown(f"**Groq call attempted:** `{groq_attempted}`")
-                if groq_attempted and groq_error is None:
-                    st.success(f"✅ Groq call succeeded")
-                    st.code(raw_response or "(empty response)", language="text")
-                elif groq_error:
-                    st.error(f"❌ Groq exception: {groq_error}")
-                else:
-                    st.warning("⚠️ Groq not attempted (no key or SDK missing) — using rule-based fallback")
+
 
             # Fallback if Groq wasn't called or failed
             if insight_answer is None:
