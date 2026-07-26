@@ -2,8 +2,7 @@
 
 GPU-accelerated cash-flow intelligence dashboard for freelancers and small business owners — built for the GenAI APAC Edition Hackathon (Cohort 2).
 
-🔗 **Live demo:** [add your Cloud Run URL here]
-🔗 **Backup deployment:** https://cash-flow-radar-avg53pwdk4mxpmt6rev5tz.streamlit.app/
+🔗 **Live demo:** [add your Streamlit Cloud URL here]
 💻 **GitHub:** https://github.com/chourasiavinit9-dev/Cash-flow-Radar
 
 ---
@@ -15,12 +14,11 @@ CashFlow Radar turns raw transaction history into a forward-looking financial de
 - **30-day cash-flow forecast** with confidence bands
 - **Cash-Flow Risk Score** (0–100) with a plain-language explanation
 - **Anomaly detection**: statistical outliers, duplicate charges, and vendor spending spikes
-- **Ask Radar** — a Gemini-powered natural language financial assistant, grounded strictly in your real data, with a reliable rule-based fallback if the API is unavailable
+- **CashFlow Insight** — a natural language financial assistant powered by Groq, grounded strictly in your real data, with a reliable rule-based fallback if the API is unavailable
 - **Scenario Simulator** — live what-if forecasting (delay an expense, add income, add a recurring cost)
 - **Smart Budget Planner** — auto-suggested budgets from historical spend, with over-budget alerts
 - **Financial Reports** — CSV export and a shareable HTML report
 - **Manual transaction entry** — add a transaction on the fly and see the risk score/forecast recalculate live (session-only)
-- **Upload Transaction CSV** — bulk-import transactions from a CSV file into the live session
 - **Live CPU vs GPU benchmark** — a real, measured pandas-vs-cuDF speedup, proving the acceleration claim rather than just stating it
 
 ## Why it matters
@@ -40,13 +38,12 @@ Freelancers and small business owners typically discover a cash-flow problem onl
   Dashboard, Accounts, Transactions, Analytics, Budgets,
   Simulator, Reports, Settings — all fully functional
 
-[GCP layer — GenAI + hosting]
-  Gemini API (via google-genai SDK) → Ask Radar, grounded + fallback-safe
-  Deployed on Google Cloud Run (Dockerized, CPU-only)
-  + Streamlit Cloud as a backup deployment
+[AI + Hosting layer]
+  Groq API (Llama 3.3) → CashFlow Insight, grounded + fallback-safe
+  Deployed on Streamlit Community Cloud (free, no billing account required)
 ```
 
-This is a deliberate, staged architecture: GPU-heavy processing happens offline (NVIDIA layer), while the always-on serving layer stays lightweight and CPU-only (GCP layer) — the same separation a real production ML system would use.
+This is a deliberate, staged architecture: GPU-heavy processing happens offline (NVIDIA layer), while the always-on serving layer stays lightweight and CPU-only — the same separation a real production ML system would use. Groq was chosen for the reasoning layer specifically because its free tier requires no billing account, keeping the entire deployment cost-free and demo-reliable.
 
 ## Technology requirement compliance
 
@@ -55,7 +52,7 @@ Satisfies the hackathon's "2+ approved technologies" requirement entirely throug
 - **cuDF** (cleaning, aggregation, benchmarked directly against pandas)
 - **cuML** (anomaly and fraud detection)
 
-GCP technologies (Gemini API, Cloud Run) were deliberately layered in during the refinement round, once Google Cloud credit became available — added on top of an already-working NVIDIA-first foundation, not required to meet the base technical bar.
+Groq API was layered in during the refinement round to add natural-language reasoning on top of an already-working NVIDIA-first foundation — not required to meet the base technical bar.
 
 ## Tech stack
 
@@ -63,9 +60,9 @@ GCP technologies (Gemini API, Cloud Run) were deliberately layered in during the
 |---|---|
 | GPU data processing | NVIDIA RAPIDS, cuDF |
 | ML / anomaly detection | cuML |
-| GenAI | Gemini API via `google-genai` (Google's current recommended SDK, supporting the 2026 Auth key format) |
+| GenAI | Groq API (Llama 3.3 70B) — free tier, no billing account required |
 | Dashboard | Streamlit + Plotly |
-| Deployment | Google Cloud Run (Docker) + Streamlit Cloud |
+| Deployment | Streamlit Community Cloud (free) |
 
 ## Running locally
 
@@ -74,9 +71,9 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-Create `.streamlit/secrets.toml` (see `.streamlit/secrets.toml.example`) with your own Gemini API key:
+Create `.streamlit/secrets.toml` (see `.streamlit/secrets.toml.example`) with your own Groq API key:
 ```toml
-GEMINI_API_KEY = "your-key-here"
+GROQ_API_KEY = "your-key-here"
 ```
 
 Then run:
@@ -86,21 +83,22 @@ Then run:
 
 ## Data pipeline
 
-Transaction data is generated and processed in a GPU-accelerated Colab notebook using RAPIDS (cuDF/cuML), then exported as CSV/JSON files consumed by this dashboard. Sample output lives in `/data`. The dashboard itself never requires a GPU at runtime — it only reads pre-computed results, which is what allows it to deploy cleanly on Cloud Run's CPU-only free tier.
+Transaction data is generated and processed in a GPU-accelerated Colab notebook using RAPIDS (cuDF/cuML), then exported as CSV/JSON files consumed by this dashboard. Sample output lives in `/data`. The dashboard itself never requires a GPU at runtime — it only reads pre-computed results, which is what allows it to deploy cleanly on Streamlit Cloud's CPU-only free tier.
 
 ## Reliability notes
 
-- **Ask Radar** is built with an engineered fallback: if the Gemini API is unavailable (rate limit, network issue, or misconfiguration), the app automatically shows a rule-based answer computed from the same real data, so the core experience never breaks.
-- **Manual transaction entry** and **CSV upload** are session-only by design (not written to disk), consistent with the prototype's other configurable settings.
+- **CashFlow Insight** is built with an engineered fallback: if the Groq API is unavailable (rate limit, network issue, or misconfiguration), the app automatically shows a rule-based answer computed from the same real data, so the core experience never breaks.
+- **Manual transaction entry** is session-only by design (not written to disk), consistent with the prototype's other configurable settings.
 
 ## Roadmap
 
 Deliberately scoped out of this round, to keep the shipped feature set reliable rather than broad:
+- CSV upload for user-provided transaction data
 - OCR-based receipt ingestion
 - Real bank account integration
 - Client-level invoice and payment-delay tracking
 - Multi-account support
 
----
+## Built for
 
 Built for the GenAI APAC Edition Hackathon, Cohort 2.
