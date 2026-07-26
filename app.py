@@ -632,7 +632,6 @@ def inject_css():
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="stSidebarCollapseButton"],
     [data-testid="baseButton-headerNoPadding"],
-    [data-testid="stSidebarNavItems"],
     button[kind="header"],
     button[title*="sidebar" i],
     button[aria-label*="sidebar" i],
@@ -641,7 +640,6 @@ def inject_css():
     button[aria-label*="Close" i],
     section[data-testid="stSidebar"] > div:first-child > button,
     [data-testid="stSidebar"] > div:first-child > div:first-child > button,
-    /* Newer Streamlit: floating collapse button rendered outside sidebar DOM */
     div[data-testid="stSidebarCollapseButton"],
     div[data-testid="collapsedControl"] {
         display: none !important;
@@ -651,8 +649,25 @@ def inject_css():
         overflow: hidden !important;
         pointer-events: none !important;
     }
-    /* Keep sidebar pinned open and fully contained */
-    [data-testid="stSidebar"] { display: block !important; transform: none !important; overflow: hidden !important; }
+    /* Keep sidebar permanently open and expanded */
+    [data-testid="stSidebar"] {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 270px !important;
+        min-width: 270px !important;
+        max-width: 270px !important;
+        transform: none !important;
+        margin-left: 0 !important;
+        visibility: visible !important;
+    }
+    [data-testid="stSidebarContent"],
+    [data-testid="stSidebarUserContent"],
+    section[data-testid="stSidebar"] > div {
+        display: block !important;
+        width: 100% !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
 
     /* ── Sidebar nav BUTTONS — transparent overlay on top of .nav-inactive div ── */
     [data-testid="stSidebar"] .stButton > button {
