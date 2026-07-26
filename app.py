@@ -187,7 +187,8 @@ def inject_css():
         padding: 1.5rem 2rem 2rem 2rem !important;
         max-width: 1600px !important;
         position: relative;
-        z-index: 1;
+        z-index: 2;
+        overflow: clip;
     }
 
     /* ── Sidebar — Liquid Glass ── */
@@ -631,21 +632,27 @@ def inject_css():
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="stSidebarCollapseButton"],
     [data-testid="baseButton-headerNoPadding"],
+    [data-testid="stSidebarNavItems"],
     button[kind="header"],
     button[title*="sidebar" i],
     button[aria-label*="sidebar" i],
     button[aria-label*="collapse" i],
     button[aria-label*="Collapse" i],
+    button[aria-label*="Close" i],
     section[data-testid="stSidebar"] > div:first-child > button,
-    [data-testid="stSidebar"] > div:first-child > div:first-child > button {
+    [data-testid="stSidebar"] > div:first-child > div:first-child > button,
+    /* Newer Streamlit: floating collapse button rendered outside sidebar DOM */
+    div[data-testid="stSidebarCollapseButton"],
+    div[data-testid="collapsedControl"] {
         display: none !important;
         visibility: hidden !important;
         width: 0 !important;
         height: 0 !important;
+        overflow: hidden !important;
         pointer-events: none !important;
     }
-    /* Keep sidebar pinned open */
-    [data-testid="stSidebar"] { display: block !important; transform: none !important; }
+    /* Keep sidebar pinned open and fully contained */
+    [data-testid="stSidebar"] { display: block !important; transform: none !important; overflow: hidden !important; }
 
     /* ── Sidebar nav BUTTONS — transparent overlay on top of .nav-inactive div ── */
     [data-testid="stSidebar"] .stButton > button {
